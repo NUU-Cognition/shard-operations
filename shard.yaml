@@ -1,0 +1,17 @@
+shard-spec: "0.4.0"
+shard: "@nuucognition/operations"
+id: 132d001d-1972-4c14-8326-3598bd1fe00d
+source:
+  id: 54a9b195-c150-4fb5-bd93-9d3e66536009
+version: "0.3.2"
+name: Operations
+shorthand: ops
+description: Work in NUU Operations through the ops CLI — the main skill sk-ops-use_operations, projects, deliverables, sections, tasks and subtasks, task groups, types and stages, deployments and their inboxes, the route decision, addresses, deadlines, blockers, plans and the plan canvas, notepads, day plans, and ops query.
+
+dependencies:
+  "@nuucognition/flint": ""
+
+# Operations owns no Mesh artifact type, no artifact folder, and no
+# dashboard. All Operations data lives in the Operations Convex backend.
+# An agent reads and changes it only through the `ops` CLI. The CLI and
+# the agent gateway it calls come from (Task) 297.
