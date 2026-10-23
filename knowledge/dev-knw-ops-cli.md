@@ -184,7 +184,7 @@ A record argument takes any of these forms:
 |---|---|---|
 | Convex ID | `k57b2m4x9q8r7t6y5u4i3o2p1a0s9d8f` | `agent.resolve` (kind, org, title, breadcrumb) |
 | Web URL | `https://ops.nuucognition.com/me/tasks/<t>`, `…/projects/<p>/deliverables/<d>?task=<t>` | the ID in the path or query, then `agent.resolve` |
-| Ops address | `@v1/acme/task/<id>#ops`, `@v1/acme/task.dev/<id>#ops`, `@v1/acme/section/<id>#ops`, `@v1/acme/deployment/<id>#ops`, `@v1/acme/project/alpha#ops`, `@v1/acme/project/alpha/deliverable/v1#ops`, `@v1/acme/taskgroup/<id>#ops` | `agent.resolve` (the object that the address names now); other text that starts with `@` is a title |
+| Ops address | `@v1/acme/task/<id>#ops`, `@v1/acme/task.dev/<id>#ops`, `@v1/acme/section/<id>#ops`, `@v1/acme/deployment/<id>#ops`, `@v1/acme/project/alpha#ops`, `@v1/acme/project/alpha/deliverable/v1#ops`, `@v1/acme/taskgroup/<id>#ops`, `@v1/acme/blocker/<id>#ops` | `agent.resolve` (the object that the address names now); other text that starts with `@` is a title |
 | Title | `"Write the docs"` | `agent.searchTasks` for tasks; the headers of the org (`headers.forOrg`) for projects, deliverables, sections, and deployments; the list queries for the other kinds |
 | Path | `"Alpha › v1 › Backend"`, `"Alpha > v1"`, `"Alpha / Backlog"` | the path of a place in the headers (`›`, `>`, and `/` are the same separator) |
 
@@ -492,15 +492,19 @@ check-up date, an owner (the person who checks it), "waiting on", a next
 step, the records it blocks, and a log. A blocker is `open`, `resolved`, or
 `dropped`. The data model is in [[dev-knw-ops-data_model#Blockers]].
 
-A `<blocker>` is a blocker ID or its title. A `<record>` is `kind:ref`, a
-URL, an address, or an ID; the kinds are `project`, `deliverable`,
-`section`, `task`, and `step`. A date takes `YYYY-MM-DD`, `today`,
-`tomorrow`, `+3d`, or `+1w` (local time).
+A `<blocker>` is a blocker address (`@v1/<org>/blocker/<id>#ops`), a
+blocker ID, or its title. An address names the org of the blocker, so it
+needs no `--org`. An ID and a title read in the active org (pass `--org`
+for another org). A `<record>` is `kind:ref`, a URL, an address, or an ID;
+the kinds are `project`, `deliverable`, `section`, `task`, `step`, and
+`deployment` (`deployment:<name>`). Only a blocker link can be a
+deployment. A date takes `YYYY-MM-DD`, `today`, `tomorrow`, `+3d`, or
+`+1w` (local time).
 
 | Command | Example |
 |---|---|
 | `ops blocker list [--open] [--due] [--on <record>]` — the open blockers (oldest check-up first), then the newest closed ones; `--due`: the open blockers whose check-up date is today or earlier | `ops blocker list --due` |
-| `ops blocker show <blocker>` — the fields, the records it links with their paths, and the log | `ops blocker show <blockerId> --json` |
+| `ops blocker show <blocker>` — the fields, the address, the records it links with their paths, and the log | `ops blocker show <blockerId> --json` |
 | `ops blocker create <title> [--check <date>] [--waiting-on <text>] [--next <text>] [--owner <member>] [--on <record>]...` — default check-up: tomorrow; default owner: you; `--on` is repeatable | `ops blocker create "No API key yet" --check +3d --waiting-on "Vendor" --on task:"Write docs"` |
 | `ops blocker update <blocker> [--title] [--waiting-on <text\|none>] [--next <text\|none>] [--owner <member\|none>]` | `ops blocker update <blockerId> --next "Call the vendor"` |
 | `ops blocker attach <blocker> <record>` — a record that is attached stays as it is | `ops blocker attach <blockerId> section:"Alpha › v1 › Backend"` |
@@ -514,6 +518,20 @@ URL, an address, or an ID; the kinds are `project`, `deliverable`,
 Use the blocker for a wait that has a check-up. At each check-up, do one
 of three things: `delay` (still blocked), `resolve` (the work can go on),
 or `drop` (it was not a blocker).
+
+Facts of the Task 376 follow-ups (2026-10-23):
+
+- `ops blocker delay` counts a later date as a delay. An earlier date moves
+  the check-up and is not a delay.
+- A task that becomes a section, and a section that becomes a task, keep
+  their blockers: the conversion moves each blocker link to the new record.
+- A deployment link, the blocker address, and the conversion rule work
+  after the next Ops release of Convex. A deployment of before that release
+  refuses a deployment link (`agent_invalid_input`), and `ops blocker show`
+  then prints no address.
+- In the web app, "Blocked" means a blocker only. A section that waits for
+  an upstream section reads "Waiting" (the code stays `blocked`, and the
+  error stays `subsection_blocked`).
 
 ### plan
 
@@ -821,7 +839,7 @@ release session); before that, each one fails on prod with
 
 | Command | What it does, and its traps |
 |---|---|
-| `ops address <record> [--kind project\|deliverable\|section\|task\|deployment\|taskgroup\|notepad\|plan\|step\|deadline\|blocker]` | The address of any record: the display address (the alias, else the id form), the id address, the `nuu://ops/<type>/<id>` URI, and `canRename`. A project, a deliverable, a task, a task group, and a notepad have an address row. A section and a deployment have the id form only (`@v1/<org>/section/<id>#ops`). A plan, a step, a deadline, a day label, and a blocker have no address: use the ID. A title needs `--kind`. `moved: true` means that the text is an old alias or an old form: use the printed address. |
+| `ops address <record> [--kind project\|deliverable\|section\|task\|deployment\|taskgroup\|notepad\|plan\|step\|deadline\|blocker]` | The address of any record: the display address (the alias, else the id form), the id address, the `nuu://ops/<type>/<id>` URI, and `canRename`. A project, a deliverable, a task, a task group, and a notepad have an address row. A section, a deployment, and a blocker have the id form only (`@v1/<org>/section/<id>#ops`, `@v1/<org>/blocker/<id>#ops`; a blocker reads it from `blockers.get`). A plan, a step, a deadline, and a day label have no address: use the ID. A title needs `--kind`. `moved: true` means that the text is an old alias or an old form: use the printed address. |
 | `ops people search <text> [--limit 1-50]`, `ops people show <@handle\|email\|user_id>` | The profiles in the scope of the active org. `people show` takes a `@handle`, an email, or a Clerk `user_` id; not `me`, and not the users-table id of `ops whoami`. `ops member list` gives the user rows that task owners and assignees use. |
 | `ops project link <project> <uri...>` | Links NUU Connect URIs (`nuu://<app>/<type>/<id>`) to a project. Each URI is stored one time; at most 50. A bad URI gives `connect_bad_request` (exit 1). `--json` gives `{id, connectRefs}`. |
 | `ops project unlink <project> <uri>` | Removes one URI. A URI that is not linked changes nothing. |
@@ -848,7 +866,8 @@ release session); before that, each one fails on prod with
 
 Other changes and traps:
 
-- Every reference resolves a blocker ID, and a notepad ID or address
+- Every reference resolves a blocker ID or address
+  (`@v1/<org>/blocker/<id>#ops`), and a notepad ID or address
   (`@v1/<org>/notepad/<id>#ops`), through `agent.resolve`. A deleted notepad
   and a personal notepad of another person are "not found".
 - A delete of a project, a deliverable, or a deployment needs an org owner

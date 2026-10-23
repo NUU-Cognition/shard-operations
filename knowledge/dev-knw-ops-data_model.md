@@ -39,7 +39,7 @@ Org (orgSlug)
 - A **backlog** is a section with the role `backlog`. The **master backlog** is the backlog section of the org.
 - A **deployment** is something that runs. A live deployment has an **inbox**: a section with the role `inbox`.
 - A **deliverable** is done only when a person marks it done.
-- A **blocker** says why work waits. It links to projects, deliverables, sections, tasks, or plan steps, and it has one date: the check-up date. It gates no status (§ Blockers).
+- A **blocker** says why work waits. It links to projects, deliverables, sections, tasks, plan steps, or deployments, and it has one date: the check-up date. It gates no status (§ Blockers). In the web app, "Blocked" means a blocker only. A section that waits for an upstream section reads "Waiting".
 - Projects, deliverables, sections, and deployments have a **hidden context**: Markdown that search and the route decision read, and that the page does not show.
 
 ## Old Words
@@ -63,7 +63,7 @@ Old notes, old tasks, and old commands use the words of the model before the rev
 | Write access | `requireOrgWriteAccess`: read access, and the org is not frozen. A frozen org refuses every write with `org_frozen`. Reads still work. |
 | Record in another org | The backend treats it as not found. |
 | IDs | Convex document IDs. Opaque strings. Each ID belongs to one table. |
-| Addresses | Each project, deliverable, section, task, deployment, notepad, and task group has a v1 address. See § Addresses. |
+| Addresses | Each project, deliverable, section, task, deployment, notepad, task group, and blocker has a v1 address. See § Addresses. |
 | Timestamps | `createdAt`, `updatedAt`, `completedAt`, `endedAt`, `removedAt` are epoch milliseconds. |
 | Clear a field | Where an arg accepts `null`, `null` clears the field. An absent arg leaves the field unchanged. |
 | Attribution | Owners and assignees are `users` row IDs (`Id<"users">`). Actors in Waybill, comments, and notifications are strings `user:<clerkUserId>`. |
@@ -81,9 +81,11 @@ Each record of these kinds has a v1 address (D13): `@v1/<org>/<kind>/<key>#ops`.
 | Task | `@v1/<org>/task/<id>#ops`; a typed task: `@v1/<org>/task.dev/<id>#ops` | The ID. An alias exists only when a person names the task. A resolve of `task/<id>` also finds a typed task. |
 | Task group | `@v1/<org>/taskgroup/<id>#ops` | The ID |
 | Notepad | `@v1/<org>/notepad/<id>#ops` | The ID |
+| Blocker | `@v1/<org>/blocker/<id>#ops` | The ID. The id form only, with no row in the address tables (R32 of ADDRESS.md). |
 
 - `<org>` is the org slug. In the personal workspace it is the owner text of the person (the handle, else `u-…`), never the Clerk subject.
-- The rules are in `convex/lib/opsAddresses.ts` (`OPS_ADDRESS_TYPES`: project, deliverable, task, notepad, taskgroup). `headers.forOrg` gives the address of each section and each deployment.
+- The rules are in `convex/lib/opsAddresses.ts` (`OPS_ADDRESS_TYPES`: project, deliverable, task, notepad, taskgroup; `OPS_ID_ONLY_TYPES`: section, deployment, blocker). `headers.forOrg` gives the address of each section and each deployment. The blocker reads give the `address` of each blocker.
+- An id form names a record of its own type only: `@v1/<org>/section/<id>#ops` with the ID of a blocker resolves to nothing.
 - `agent.resolve({id, orgSlug?})` gives the record of an ID or an address.
 - Every command of the `ops` CLI prints the address of each record that it shows. Every record argument takes an ID, an address, a web URL, a title, or a path (`Alpha › v1 › Backend`). See [[dev-knw-ops-cli]].
 
@@ -187,7 +189,7 @@ A system section (a section with a role) cannot move (`section_role_locked`). A 
 | Status | Condition |
 |--------|-----------|
 | `done` | The section has root tasks and every root task is `done` |
-| `blocked` | A `dependsOn` section is not `done` |
+| `blocked` | A `dependsOn` section is not `done`. The web app calls this status **Waiting** ("Waiting on an upstream section"), because "Blocked" means a blocker only (§ Blockers). The code stays `blocked`. |
 | `in-progress` | A task is `doing` |
 | `ready` | Otherwise. A section with no tasks is never done. |
 
@@ -237,9 +239,9 @@ A system section (a section with a role) cannot move (`section_role_locked`). A 
 | `subsection_conversion_held_by_strike` | Remove it from Strike |
 | `subsection_conversion_destination_invalid` | Choose another section in the same deliverable |
 
-The new task goes to `destinationSubsectionId`, or to the project backlog when absent. Plan steps, deadlines, and tree nodes that link to the section now link to the task. Returns `{task, context}`.
+The new task goes to `destinationSubsectionId`, or to the project backlog when absent. Plan steps, deadlines, tree nodes, and blockers that link to the section now link to the task (`repointWraps` in `lib/wrapResolve.ts`). An open blocker writes the `blocked` cache of the new task. Returns `{task, context}`.
 
-**Conversion back** (`tasks.promoteTaskToSubsection`, args `orgSlug, taskId, deliverableId?`). The task becomes a section of a deliverable, with the task title. A non-empty body goes into a first task titled "Notes" with the task's status, owner, and rarity. Links follow the new section. A task in a section of a deliverable stays in its deliverable (`promotion_deliverable_fixed`). A backlog task needs `deliverableId` (`promotion_deliverable_required`). Returns `{subsection, preservedTaskId, context}`.
+**Conversion back** (`tasks.promoteTaskToSubsection`, args `orgSlug, taskId, deliverableId?`). The task becomes a section of a deliverable, with the task title. A non-empty body goes into a first task titled "Notes" with the task's status, owner, and rarity. Links follow the new section: the plan steps, deadlines, tree nodes, and blockers that link to the task now link to the section. A task in a section of a deliverable stays in its deliverable (`promotion_deliverable_fixed`). A backlog task needs `deliverableId` (`promotion_deliverable_required`). Returns `{subsection, preservedTaskId, context}`.
 
 ## Deliverables
 
@@ -644,7 +646,7 @@ Table `blockers`. Module `blockers` (the helpers: `lib/blockers.ts`). Since (Tas
 | `checkAt` | string | The next check-up, `YYYY-MM-DD`. Else `blocker_check_invalid`. Default at create and reopen: tomorrow. |
 | `ownerUserId` | `Id<"users">`, optional | The person who checks it. The check-up notice goes to this person. |
 | `status` | `"open"` \| `"resolved"` \| `"dropped"` | |
-| `links` | `{kind, id}[]` | The records it blocks. `kind`: `project`, `deliverable`, `subsection` (a section), `task`, `plan-node` (a step). The CLI kinds are `project`, `deliverable`, `section`, `task`, `step`. |
+| `links` | `{kind, id}[]` | The records it blocks. `kind`: `project`, `deliverable`, `subsection` (a section), `task`, `plan-node` (a step), `deployment`. The CLI kinds are `project`, `deliverable`, `section`, `task`, `step`, `deployment`. A deadline cannot link a deployment; a blocker can. |
 | `delayCount` | number | The number of delays. A blocker that moves again and again is stuck. |
 | `log` | `{kind, at, actor?, note?, from?, to?}[]` | The newest 100 events, oldest first. `kind`: `create`, `delay`, `resolve`, `drop`, `reopen`. `from` and `to` are the check-up dates of a delay. |
 | `closedAt`, `closedBy`, `createdBy`, `createdAt`, `updatedAt` | | |
@@ -659,22 +661,29 @@ Each text (title, waiting on, next step, note) has at most 500 characters (`bloc
 4. `delay`, `resolve`, and `drop` act only on an open blocker (`blocker_closed`). `reopen` acts on a resolved or dropped blocker and sets a new check-up date.
 5. `remove` deletes the blocker and its log. The CLI says it cannot be undone. Prefer `resolve` or `drop`: they keep the log.
 6. A daily job (`notifyDue`) sends a check-up notice to the owner of each open blocker whose check-up date has come.
-7. **Each blocker write is a Waybill gesture** (checked in `convex/blockers.ts`: each public mutation comes from the `waybill` wrapper and calls `ctx.journal.label`). The scope is the org: `org:<orgSlug>`. The actions are `blocker.create`, `blocker.edit`, `blocker.attach` or `blocker.links`, `blocker.detach`, `blocker.delay`, `blocker.resolve`, `blocker.drop`, `blocker.reopen`, and `blocker.delete`; each targets `{type: "blocker", id}`. So the activity feed of the org shows them, and `ops history --scope org:<org>` then `ops undo --scope org:<org> --expect <seq>` replays one. The CLI maps no blocker to a scope for `--on`: use `--scope org:<org>`. The scope `org:<org>` also holds the other org gestures (deadlines, day labels, deployments): read the head entry before an undo. A delete is still final in the CLI (`blocker delete` says it cannot be undone): prefer `resolve` or `drop`.
+7. A conversion (a task to a section, a section to a task) moves each blocker link of the consumed record to its successor, in open and closed blockers (`repointWraps`). When the successor is a task, an open blocker writes its `blocked` cache.
+8. A link reads the status of its record through the wrap resolver. A deployment reads as `doing` when it is live, `todo` when it is paused, and `done` when it is retired. A deleted record gives a broken link (`broken: true`). `detach` removes a broken link.
+9. A blocker has the id address `@v1/<org>/blocker/<id>#ops` (§ Addresses). Each read (`list`, `get`, `forRecord`) gives it as `address`. `agent.resolve` reads it.
+10. **Each blocker write is a Waybill gesture** (checked in `convex/blockers.ts`: each public mutation comes from the `waybill` wrapper and calls `ctx.journal.label`). The scope is the org: `org:<orgSlug>`. The actions are `blocker.create`, `blocker.edit`, `blocker.attach` or `blocker.links`, `blocker.detach`, `blocker.delay`, `blocker.resolve`, `blocker.drop`, `blocker.reopen`, and `blocker.delete`; each targets `{type: "blocker", id}`. So the activity feed of the org shows them, and `ops history --scope org:<org>` then `ops undo --scope org:<org> --expect <seq>` replays one. The CLI maps no blocker to a scope for `--on`: use `--scope org:<org>`. The scope `org:<org>` also holds the other org gestures (deadlines, day labels, deployments): read the head entry before an undo. A delete is still final in the CLI (`blocker delete` says it cannot be undone): prefer `resolve` or `drop`.
 
 | Op | Args | Notes |
 |----|------|-------|
 | `blockers.list` | `orgSlug, closedLimit?` | The open blockers, then the newest closed ones (at most 50) |
-| `blockers.get` | `orgSlug, blockerId` | The fields, the resolved links, and the log |
-| `blockers.forRecord` | `orgSlug, kind, id` | The blockers that link one record |
+| `blockers.get` | `orgSlug, blockerId` | The fields, the resolved links, the log, and the `address` |
+| `blockers.forRecord` | `orgSlug, kind, id` | The blockers that link one record. `kind`: a link kind, also `deployment` |
 | `blockers.create` | `orgSlug, title, checkAt?, waitingOn?, next?, ownerUserId?, links?` | |
 | `blockers.update` | `orgSlug, blockerId, title?, waitingOn?\|null, next?\|null, ownerUserId?\|null` | `null` clears |
 | `blockers.setLinks` / `attach` / `detach` | `orgSlug, blockerId, links` / `orgSlug, blockerId, link` | `blocker_link_not_found` for a record that is not there; `detach` also takes a broken link |
-| `blockers.delay` | `orgSlug, blockerId, checkAt, note?` | Adds 1 to `delayCount` |
+| `blockers.delay` | `orgSlug, blockerId, checkAt, note?` | A later date adds 1 to `delayCount`; an earlier date moves the check-up and is not a delay; the same date with a note only logs the note |
 | `blockers.resolve` / `drop` | `orgSlug, blockerId, note?` | |
 | `blockers.reopen` | `orgSlug, blockerId, checkAt?` | |
 | `blockers.remove` | `orgSlug, blockerId` | Hard delete |
 
 The CLI is `ops blocker list|show|create|update|attach|detach|delay|resolve|drop|reopen|delete` ([[dev-knw-ops-cli]]).
+
+**The web app.** The panel `/<org>/blockers` has the groups "Due for check", "Upcoming", and "Closed". The task page and the task dialog show the field "Blockers" in the field grid, under "Deadlines" (an open task only; a done task shows its result). The blocker form attaches projects, deliverables, sections, tasks, plan steps, and deployments (not a retired deployment).
+
+**The release.** The deployment link, the blocker address, and the re-point of a conversion are follow-ups of Task 376 (2026-10-23). They work after the next Ops release of Convex. A deployment of before that release refuses a deployment link (`agent_invalid_input`) and gives no `address`.
 
 ## Plans and Steps
 
