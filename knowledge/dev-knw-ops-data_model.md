@@ -78,7 +78,7 @@ Each record of these kinds has a v1 address (D13): `@v1/<org>/<kind>/<key>#ops`.
 | Deliverable | `@v1/<org>/project/<project key>/deliverable/<name>#ops` | A name local to its project, from the title (`0.1.0` gives `0-1-0`; a suffix when the project has the name). The id form `@v1/<org>/deliverable/<id>#ops` stays flat. |
 | Section | `@v1/<org>/section/<id>#ops` | The ID |
 | Deployment | `@v1/<org>/deployment/<id>#ops` | The ID |
-| Task | `@v1/<org>/task/<id>#ops`; a typed task: `@v1/<org>/task.dev/<id>#ops` | The ID. An alias exists only when a person names the task. A resolve of `task/<id>` also finds a typed task. |
+| Task | `@v1/<org>/task/<id>#ops` | The ID. An alias exists only when a person names the task. An old address with the type word `task.dev` (`@v1/<org>/task.dev/<id>#ops`, in old Flint task notes) still finds the task. |
 | Task group | `@v1/<org>/taskgroup/<id>#ops` | The ID |
 | Notepad | `@v1/<org>/notepad/<id>#ops` | The ID |
 | Blocker | `@v1/<org>/blocker/<id>#ops` | The ID. The id form only, with no row in the address tables (R32 of ADDRESS.md). |
@@ -318,7 +318,7 @@ A subtask has the home fields of its root task. Each list of a section, a backlo
 
 Placement errors: `task_folder_in_subsection`, `task_subsection_required`, `task_deliverable_required`, `task_project_required`, `task_unplaced_with_home`, `project_not_found`, `deliverable_not_found`, `deliverable_project_mismatch`, `subsection_not_found`, `backlog_folder_not_found`.
 
-**Status cycle.** `todo → doing → done`. Any change is allowed, with two gates: a change to `done` in a section with an open upstream section gives `subsection_blocked`, and a typed task closes only at a closable stage (§ The Task Primitive). The section `completedAt` updates after every status change and every move.
+**Status cycle.** `todo → doing → done`. Any change is allowed, with one gate: a change to `done` in a section with an open upstream section gives `subsection_blocked`. The section `completedAt` updates after every status change and every move.
 
 **Priority bands.** Every list sorts by the ladder `urgent → high → medium → (no priority) → low`, then by `order`. A move from a backlog into a section of a deliverable clears the priority. A backlog here is any section with no deliverable: the backlog section, a queue, another section of a project, an inbox, or a section of the org. Every other move keeps the priority, unless the caller passes one. The input value `"queue"` is legacy and reads as no priority.
 
@@ -415,8 +415,6 @@ Module `subtasks` (D5). A subtask is a full task with a parent task (`parentTask
 |------|-------------------|-------|
 | Status | `checkbox` | Every task has one: `todo`, `doing`, or `done`. `blocked` (`{reason, next?, at}`) is a read cache of the oldest open blocker that links the task (§ Blockers). |
 | Outcome | `outcome`: `"completed"` \| `"dropped"` \| `"superseded"` | Only on a done task. A close sets it (default `completed`). A reopen clears it. |
-| Task type | `type` (for example `task.dev`), `typeVersion`, `fields`; table `task_types` | A versioned extension of the base type `task`. It adds fields and stages. |
-| Stage | `stage`; table `task_stage_events` | The second layer of a typed task. The stages are an order for display, not a gate. |
 | Unplaced | `unplaced: true` | A task with no home. A normal state. |
 | Task group | tables `task_groups`, `task_group_members` | A set of tasks that are done together, usually in one session. A task can be in many groups. A group is open while one of its tasks is open. |
 | Lineage | table `task_links`: `split-from`, `merged-into`, `continues-from`, `after` | A link never deletes history. |
@@ -424,38 +422,31 @@ Module `subtasks` (D5). A subtask is a full task with a parent task (`parentTask
 | Attachment | table `task_attachments`: `session`, `fleet`, `note`, `repo` | A link from a task or a task group to a session, a fleet, a note, or a repository |
 | Stable key | table `task_keys`; `restoreKey` | The key never changes, also not at an undo or a redo. The rows of the tables above name the key, so an old ID still finds the task. |
 
-**The type `task.dev@0.1`.** Fields `repo` (text) and `wipCommits` (list). Stages `scoped` → `built` → `reviewed` → `verified`. A dev task closes at `reviewed` or at `verified`. Only a person sets `verified`.
+A task has no type and no stage. The task types (`task.dev`, its stages, and its fields `repo` and `wipCommits`) were removed on 2026-11-03 (operator page feedback). The state of a task is its status, its outcome, and its result: a session writes its commits and its session id in the result. The schema keeps the old fields and the tables `task_types` and `task_stage_events` only until `taskTypesRemoval:removeTaskTypes` has cleared them on each deployment.
 
 **Rules.**
 
-1. A stage write refuses a stage that the type does not define (`task_stage_unknown`), a write on an untyped task (`task_untyped`), and a write that the stage does not allow for the actor (`task_stage_forbidden`).
-2. `built` and `reviewed` set the status `doing` when it is `todo`. `scoped` and `verified` do not change the status.
-3. A close with the outcome `completed` on a typed task needs a stage with `canClose: true`, else `task_stage_not_closable`. `dropped` and `superseded` are allowed at any stage. `tasks.update` with `checkbox: "done"` follows the same rule.
-4. A reopen sets `doing`, clears `outcome`, and keeps the stage and its history.
-5. `tasks.setType` changes the type. `type: null` makes the task untyped. A done task refuses (`task_type_done`).
-6. A write is by an agent when its agent mark has a session (the CLI sends `ORBH_SESSION_ID`). The mark is provenance, not security.
+1. A close sets the outcome: `completed` (the default), `dropped`, or `superseded`, at any time. `tasks.update` with `checkbox: "done"` sets `completed`.
+2. A reopen sets `doing` and clears `outcome`.
+3. A write is by an agent when its agent mark has a session (the CLI sends `ORBH_SESSION_ID`). The mark is provenance, not security.
 
 **Lineage.**
 
-- **Split** (`taskLinks.split`): each part is a new task with the home, the type, and the relations of the old task. The old task closes with `superseded`, unless `keepOpen`.
+- **Split** (`taskLinks.split`): each part is a new task with the home and the relations of the old task. The old task closes with `superseded`, unless `keepOpen`.
 - **Merge** (`taskLinks.merge`): each other task gets `merged-into → survivor`, and an open one closes with `superseded`.
-- **Continue** (`taskLinks.continue`): a new task with the home and the type of the old task gets `continues-from → old`. An open old task closes with `superseded`.
+- **Continue** (`taskLinks.continue`): a new task with the home of the old task gets `continues-from → old`. An open old task closes with `superseded`.
 - **Chain** (`taskLinks.chain`): each task after the first gets `after → the task before it`. A cycle is refused (`task_link_cycle`). A task in a chain is ready when the task before it is done.
 
 | Op | Args |
 |----|------|
 | `tasks.close` / `reopen` | `orgSlug, taskId, outcome?, result?` / `orgSlug, taskId` |
-| `tasks.setFields` | `orgSlug, taskId, set?, append?, remove?` |
-| `tasks.setType` | `orgSlug, taskId, type\|null, typeVersion?` |
-| `tasks.listAll`, `listAllPage`, `listUnplaced`, `detail` | `orgSlug` and filters (`includeDone?, type?, stage?, unplaced?`) / `orgSlug, taskId` |
-| `taskStages.set` | `orgSlug, taskId, stage, note?` |
-| `taskTypes.list` / `get` | `{}` / `type, version?` |
+| `tasks.listAll`, `listAllPage`, `listUnplaced`, `detail` | `orgSlug` and filters (`includeDone?, unplaced?, withSubtasks?`) / `orgSlug, taskId` |
 | `taskLinks.split`, `merge`, `continue`, `chain`, `unchain` | See Lineage |
 | `taskGroups.create`, `update`, `addTask`, `removeTask`, `remove`, `get`, `list` | `orgSlug, groupId?, title?, taskIds?` |
 | `taskRelations.add`, `remove`, `listForRef`, `hints` | `orgSlug, taskId, kind, ref` |
 | `taskAttachments.attach`, `detach`, `setState` | `orgSlug, taskId?\|groupId?, kind, ref` |
 
-A task summary (`listAll`, `listUnplaced`, the members of a group) has `homeLabel` (`Project › Deliverable › Section`, or `null` for an unplaced task) and `address`. The full contract is in the Mesh note `(Task) 1287 Task Primitive v0.1 - One Ops Task Entity, the Tasks Shard, and Session Pins`, section Contract v0.1. The verbs of the CLI are `ops task stage|retype|close|result|field|commit|home|relate|unrelate|hints|split|merge|continue|chain|unchain|attach|detach|group|type` ([[dev-knw-ops-cli]]).
+A task summary (`listAll`, `listUnplaced`, the members of a group) has `homeLabel` (`Project › Deliverable › Section`, or `null` for an unplaced task) and `address`. The full contract is in the Mesh note `(Task) 1287 Task Primitive v0.1 - One Ops Task Entity, the Tasks Shard, and Session Pins`, section Contract v0.1. The verbs of the CLI are `ops task close|result|home|relate|unrelate|hints|split|merge|continue|chain|unchain|attach|detach|group` ([[dev-knw-ops-cli]]).
 
 ## The Task Map
 
@@ -1145,7 +1136,6 @@ The gateway returns `{ok: false, error: {code, message, data?}}`. The codes belo
 | `move_too_large` | A move of more than 200 tasks | Move them in parts |
 | `task_text_conflict` | `expectedTitle` or `expectedBody` is stale | Read the task again |
 | `task_order_invalid`, `task_order_duplicate`, `task_order_incomplete` | Bad `tasks.reorder` list | Send one complete bucket |
-| `task_stage_unknown`, `task_untyped`, `task_stage_forbidden`, `task_stage_not_closable`, `task_type_done`, `task_type_unknown`, `task_field_unknown`, `task_field_invalid` | Task primitive rule | See § The Task Primitive |
 | `task_link_cycle` | A chain or a merge would make a loop | Choose other tasks |
 | `promotion_deliverable_fixed`, `promotion_deliverable_required` | Bad promote target | See Sections § Conversion back |
 | `deployment_name_required` | A deployment with no name | Give a name |

@@ -184,7 +184,7 @@ A record argument takes any of these forms:
 |---|---|---|
 | Convex ID | `k57b2m4x9q8r7t6y5u4i3o2p1a0s9d8f` | `agent.resolve` (kind, org, title, breadcrumb) |
 | Web URL | `https://ops.nuucognition.com/me/tasks/<t>`, `…/projects/<p>/deliverables/<d>?task=<t>` | the ID in the path or query, then `agent.resolve` |
-| Ops address | `@v1/acme/task/<id>#ops`, `@v1/acme/task.dev/<id>#ops`, `@v1/acme/section/<id>#ops`, `@v1/acme/deployment/<id>#ops`, `@v1/acme/project/alpha#ops`, `@v1/acme/project/alpha/deliverable/v1#ops`, `@v1/acme/taskgroup/<id>#ops`, `@v1/acme/blocker/<id>#ops` | `agent.resolve` (the object that the address names now); other text that starts with `@` is a title |
+| Ops address | `@v1/acme/task/<id>#ops`, `@v1/acme/section/<id>#ops`, `@v1/acme/deployment/<id>#ops`, `@v1/acme/project/alpha#ops`, `@v1/acme/project/alpha/deliverable/v1#ops`, `@v1/acme/taskgroup/<id>#ops`, `@v1/acme/blocker/<id>#ops` | `agent.resolve` (the object that the address names now); an old task address with the type word `task.dev` (`@v1/acme/task.dev/<id>#ops`, in old Flint task notes) names the same task; other text that starts with `@` is a title |
 | Title | `"Write the docs"` | `agent.searchTasks` for tasks; the headers of the org (`headers.forOrg`) for projects, deliverables, sections, and deployments; the list queries for the other kinds |
 | Path | `"Alpha › v1 › Backend"`, `"Alpha > v1"`, `"Alpha / Backlog"` | the path of a place in the headers (`›`, `>`, and `/` are the same separator) |
 
@@ -339,17 +339,17 @@ reads stdin.
 
 | Command | Example |
 |---|---|
-| `ops task list [--project \| --deliverable \| --section \| --deployment \| --master \| --mine [--all-orgs]] [--backlog] [--status open\|todo\|doing\|done\|all] [--priority <p\|none>] [--owner <me\|member\|none>] [--type <type>] [--stage <stage>] [--limit n]` — root tasks, each with its place and address; `--section` keeps the order of the section and gives the subtask counts (`sections.tasks`); `--deployment` lists the inbox (`deployments.inbox`); default `--status open`; more than one scope flag is a usage error | `ops task list --section "Alpha › v1 › Backend" --status all` |
-| `ops task list --all [--type <type>] [--stage <stage>] [--status …] [--limit n]` — every task of the org, placed and unplaced, newest first, as task summaries (address, type, stage, home label); `--limit` is the total (default 200) | `ops task list --all --type task.dev --stage reviewed --json` |
-| `ops task list --unplaced [--type <type>] [--stage <stage>]` — the tasks with no home; when the tasks need more bytes than one read (`task_read_too_large`), the CLI reads the pages of `tasks.listAllPage`; a page that is not the last and does not move the cursor stops the list (`pagination_stalled`, exit 1, no rows) | `ops task list --unplaced` |
-| `ops task show <task>` — also the address, the parent, the subtasks (the tree with the done count; `--json`: `subtasks`), the type and the stage, the outcome, the fields, the lineage, the task groups, the related links, the attachments, and the stage history; when the incoming lineage stops at its byte budget, `--json` has `linksCut: true` and the text says so; a task with a Flint task note gives the lines `note` (the label, else the address) and `note link` (the open link), and `--json` has `note`, `noteLabel`, and `noteUrl` at the top (each `null` when the task has no note) | `ops task show @v1/test/task.dev/<id>#ops` |
+| `ops task list [--project \| --deliverable \| --section \| --deployment \| --master \| --mine [--all-orgs]] [--backlog] [--status open\|todo\|doing\|done\|all] [--priority <p\|none>] [--owner <me\|member\|none>] [--limit n]` — root tasks, each with its place and address; `--section` keeps the order of the section and gives the subtask counts (`sections.tasks`); `--deployment` lists the inbox (`deployments.inbox`); default `--status open`; more than one scope flag is a usage error | `ops task list --section "Alpha › v1 › Backend" --status all` |
+| `ops task list --all [--status …] [--limit n]` — every task of the org, placed and unplaced, newest first, as task summaries (address, home label); `--limit` is the total (default 200) | `ops task list --all --status done --json` |
+| `ops task list --unplaced [--status …] [--limit n]` — the tasks with no home; when the tasks need more bytes than one read (`task_read_too_large`), the CLI reads the pages of `tasks.listAllPage`; a page that is not the last and does not move the cursor stops the list (`pagination_stalled`, exit 1, no rows) | `ops task list --unplaced` |
+| `ops task show <task>` — also the address, the parent, the subtasks (the tree with the done count; `--json`: `subtasks`), the outcome, the lineage, the task groups, the related links, and the attachments; when the incoming lineage stops at its byte budget, `--json` has `linksCut: true` and the text says so; a task with a Flint task note gives the lines `note` (the label, else the address) and `note link` (the open link), and `--json` has `note`, `noteLabel`, and `noteUrl` at the top (each `null` when the task has no note) | `ops task show @v1/test/task/<id>#ops` |
 | `ops task context <task> [--comments <n>]` — the full context of a task for an agent: the description, the place, the people, and the comments (no change events); `--comments` keeps the newest n (1 to 500, default 200). Read it before you work on a task | `ops task context <taskId> --comments 20 --json` |
 | `ops task search <query> [--limit 1-100]` | `ops task search docs --limit 5` |
-| `ops task create <title> [--section <s> \| --project <p> \| --deliverable <d> \| --deployment <d> \| --parent <task> \| --route [text] \| --master \| --unplaced] [--tag feedback\|hotfix\|ongoing\|recurring] [--every day\|week\|month] [--type <type>] [--repo <name>] [--note <address> [--note-label <text>]] [--body <md\|-> \| --body-file <path>] [--priority low\|medium\|high\|urgent] [--assign <me\|member>] [--top]` — default: the master backlog, at the end; `--project` is its backlog section, `--deliverable` its first open section, `--deployment` its inbox, `--parent` a subtask; `--route` asks `route.suggest` with the text (default: the title) and prints the place, the score, and the reason; the output gives the stored title (a trailing digit of the title is the rarity: "Fix login 1" is stored as "Fix login"), the address, and the section | `ops task create "Login fails on Safari" --deployment Production --tag hotfix` |
+| `ops task create <title> [--section <s> \| --project <p> \| --deliverable <d> \| --deployment <d> \| --parent <task> \| --route [text] \| --master \| --unplaced] [--tag feedback\|hotfix\|ongoing\|recurring] [--every day\|week\|month] [--repo <name>] [--note <address> [--note-label <text>]] [--body <md\|-> \| --body-file <path>] [--priority low\|medium\|high\|urgent] [--assign <me\|member>] [--top]` — default: the master backlog, at the end; `--project` is its backlog section, `--deliverable` its first open section, `--deployment` its inbox, `--parent` a subtask; `--route` asks `route.suggest` with the text (default: the title) and prints the place, the score, and the reason; `--repo` adds a `repo` related link (`taskRelations.add`); the output gives the stored title (a trailing digit of the title is the rarity: "Fix login 1" is stored as "Fix login"), the address, and the section | `ops task create "Login fails on Safari" --deployment Production --tag hotfix` |
 | `ops task update <task> [--title] [--body <md\|-> \| --body-file <path>] [--priority <p\|none>] [--assign <member\|none>] [--rarity <1-7\|none>] [--tag <tag\|none>] [--every day\|week\|month\|none]` — `--tag` and `--every` need `tasks.update` with `tag` and `recurrence` (MODEL; a deployment without them refuses with `agent_invalid_input`) | `ops task update "Write docs" --body-file notes.md` |
 | `ops task start <task>` — doing | `ops task start "Write docs"` |
 | `ops task done <task>` — the same as `close` with the outcome `completed` | `ops task done "Write docs"` |
-| `ops task reopen <task>` — doing; the outcome goes, the stage stays | `ops task reopen "Write docs"` |
+| `ops task reopen <task>` — doing; the outcome goes | `ops task reopen "Write docs"` |
 | `ops task move <tasks...> --to <place> [--priority <p\|none>]` — one task: `tasks.move`; more tasks: `tasks.moveMany`; each takes its subtree; the places are in [Places](#places---to-of-task-move); the former `--subsection`, `--backlog`, and `--folder` still work, hidden | `ops task move <a> <b> --to section:"Alpha › v1 › Backend"` |
 | `ops task reorder <task> (--before <t>\|--after <t>\|--top\|--bottom)` | `ops task reorder "Write docs" --after "Draft outline"` |
 | `ops task delete <task> [--with-subtasks]` — the service refuses a task with subtasks without the flag (`task_has_subtasks`) | `ops task delete "Write docs"` |
@@ -378,29 +378,23 @@ unplaced task has no order bucket: `ops task reorder` refuses it
 #### The task primitive v0.1 ((Task) 1287 of the NUU Flint)
 
 A task has one status (`todo`, `doing`, `done`). A done task has one
-outcome: `completed`, `dropped`, or `superseded`. A task type (for example
-`task.dev@0.1`) adds fields and stages. The stages are a second layer: any
-stage can follow any stage. A typed task closes as `completed` only at a
-stage that can close (for `task.dev`: `reviewed` or `verified`). Only a
-person sets `verified`. A write is by an agent when `ORBH_SESSION_ID` is
-set (the CLI sends it as `X-Agent-Session`). A task has 0 or 1 home and 0
-or more related links. A task with no home is **unplaced**, and that is
-normal.
+outcome: `completed`, `dropped`, or `superseded`. A task has no type and
+no stage: each task has the address `@v1/<org>/task/<id>#ops`, and a task
+closes as `completed` at any time. A write is by an agent when
+`ORBH_SESSION_ID` is set (the CLI sends it as `X-Agent-Session`). A task
+has 0 or 1 home and 0 or more related links. A task with no home is
+**unplaced**, and that is normal.
 
 | Command | Example |
 |---|---|
-| `ops task stage <task> <stage> [--note <text>]` — `taskStages.set` | `ops task stage <task> reviewed --note "No high finding"` |
-| `ops task retype <task> (<type>[@<version>] \| --none) [--type-version <v>]` — `tasks.setType` (amendment 6); a new type takes its active version; the stage and the fields stay only when the new type defines them (the same name and kind); `--none` makes the task untyped; the same type and version changes nothing; a done task refuses with `task_type_done` (reopen it first) | `ops task retype <task> task.dev` |
 | `ops task close <task> [--outcome completed\|dropped\|superseded] [--result <md\|->]` — `tasks.close`; default `completed` | `ops task close <task> --outcome dropped` |
 | `ops task result <task> <md\|->` — `""` clears it | `ops task result <task> "The pin works on dev."` |
 | `ops task note <task> <address> [--label <text>]` / `ops task note <task> --clear` — `tasks.setNote` ((Task) 1291): the Flint task note holds the content, and Ops keeps its address, `@v1/<org>/task/<note id>#flint/<flint>` (`flint resolve @v1//task/<n> --json` gives it); a new address with no `--label` clears the label; `--json` gives `{taskId, address, note, noteLabel, noteUrl}`; `noteUrl` is `obsidian://nuu-flint?address=` and the encoded note address, and the NUU Flint plugin opens it; a wrong address refuses with `task_note_invalid` | `ops task note <task> @v1/nuucognition/task/<uuid>#flint/nuu-flint --label "Task 1291 · NUU Flint"` |
-| `ops task field <task> <name> <value> [--append \| --remove]` — `tasks.setFields`; `""` clears the field; a list field gets the value as its one item; `--append` adds one item, once; `--remove` (amendment 6) deletes each item equal to the value from a list field in one write, so an append of another person at the same time stays (an item that is not in the list is no change); `--append` and `--remove` together are a usage error | `ops task field <task> wipCommits 1a2b3c4 --remove` |
-| `ops task commit <task> <sha> [--repo <name>]` — appends `<sha>` or `<sha> (<repo>)` to `wipCommits` | `ops task commit <task> 1a2b3c4d --repo flint` |
 | `ops task home <task> (--section <s> \| --backlog [--project <p>] [--folder <f>] \| --none)` — `tasks.home`; `--project` and `--folder` imply `--backlog`; `--backlog` alone is the master backlog; `--none` unplaces the task; for a deliverable, a deployment, or a parent, use `ops task move --to` | `ops task home <task> --backlog --project Alpha` |
 | `ops task relate <task> <kind> <ref> [--label <text>]` — kinds: `project`, `deliverable` (an ID, URL, or title), `repo` (a name), `flint` (a Flint id), `address` (a v1 address); a second relate changes only the label | `ops task relate <task> repo main` |
 | `ops task unrelate <task> <kind> <ref>` | `ops task unrelate <task> project Alpha` |
 | `ops task hints [--flint <id>] [--repo <name>] [--text <text>]` — proposed homes from a Flint, a repository, or a text, best first; each line ends with the flags for `ops task home`; for a text, `ops route` is the decision of the revamp | `ops task hints --text "Fix the login page"` |
-| `ops task split <task> --part <title> [--part <title> ...] [--keep-open]` — the parts get the home, the type, and the related links; the old task closes as `superseded` | `ops task split <task> --part Backend --part Frontend` |
+| `ops task split <task> --part <title> [--part <title> ...] [--keep-open]` — the parts get the home and the related links; the old task closes as `superseded` | `ops task split <task> --part Backend --part Frontend` |
 | `ops task merge <task> <task>... (--into <task> \| --title <title>)` — the open absorbed tasks close as `superseded` | `ops task merge <a> <b> --into <c>` |
 | `ops task continue <task> [--title <title>]` — default title `<old title> (continued)`; an open old task closes as `superseded` | `ops task continue <task>` |
 | `ops task chain <task> <task> [<task>...]` — in order; a task is ready when the task before it is done | `ops task chain <first> <second> <third>` |
@@ -410,10 +404,7 @@ normal.
 
 `--json` output: `show` gives the C6 detail with `address` at the top
 level, and the present keys (`breadcrumb`, `orgSlug`, `url`). `create`,
-`split`, `merge`, and `continue` give the new ids and their addresses.
-`retype` gives `{taskId, address, type, typeVersion, stage, fields}` after
-the write (`null` for an absent value): the address follows the type
-(`task.dev/<id>` or `task/<id>`), and an old address still resolves. When
+`split`, `merge`, and `continue` give the new ids and their addresses. When
 the read of an address after a write fails, the result keeps the new id with
 `address: null` (exit 0), and stderr names the read to run again: do not run
 the write again.
@@ -437,13 +428,6 @@ open). The attachments of a group show on each of its tasks.
 | `ops task group show <group>` — `--json`: `{address, group, tasks, open, attachments, url}`; `url` is the web page of the group (the Groups view of the Tasks page); the address is the field `address` of `taskGroups.get` (a warning on stderr when it is null); when the tasks stop at their byte budget, `--json` has `tasksCut: true` after `tasks` and the text says so | `ops task group show @v1/test/taskgroup/<id>#ops --json` |
 | `ops task group list [--open]` | `ops task group list --open` |
 | `ops task group delete <group>` — deletes the group and its members, not the tasks | `ops task group delete "Login fixes"` |
-
-### task type
-
-| Command | Example |
-|---|---|
-| `ops task type list` — the active types | `ops task type list` |
-| `ops task type show <type>[@<version>] [--type-version <v>]` — the fields and the stages; with no version, the latest active version. The program owns `--version` (it prints the version of the CLI anywhere on the line), so a type version is `<type>@<version>` or `--type-version` | `ops task type show task.dev@0.1` |
 
 ### comment
 
@@ -791,8 +775,8 @@ The rules:
   list fails with `query_unknown_table`. Tables that hold a secret, a token,
   a credential, an auth record, or a Strike sync internal are not readable,
   and neither is a table with no org field (for example `users`,
-  `day_plans`, `task_types`, the `strike*` tables). For those, use
-  `ops member list`, `ops day show`, and `ops task type list`.
+  `day_plans`, the `strike*` tables). For those, use `ops member list` and
+  `ops day show`.
 - The rule `user` (for example `favourites`, `recent_subsections`) gives
   only the rows of the caller. The rule `notepad` gives a general notepad, or
   a personal notepad that the caller wrote.
@@ -847,7 +831,6 @@ release session); before that, each one fails on prod with
 | `ops deployment sections <deployment> [--open] [--project <p>]` | The sections of a deployment other than its inbox (sections that a move put there). `ops deployment inbox` lists the inbox only. |
 | `ops deliverable status (<deliverable> [--project <p>] \| --project <p>)` | The derived status of a deliverable (`open`, `in-progress`, `blocked`, `completed`) and of each section (`blocked`, `ready`, `in-progress`, `done`). `ops deliverable done` is the mark of a person and wins. `partial: true` means that the read budget stopped. |
 | `ops project create … --deployment <d>`, `ops project update <project> --deployment <d\|none>` | The deployment that a project ships to (a link only). |
-| `ops task create … --type <type> --stage <stage>` | Sets the type and the first stage in one write. |
 | `ops task link <task> <previous>` | Links two tasks that exist (continues-from). It closes nothing. `ops task continue` makes a NEW task. |
 | `ops task unlink <task> [--kind continues-from\|after]` | Removes a link. `ops task chain\|unchain` manage the `after` links. |
 | `ops task related <kind> <ref>` | The reverse of `task relate`: the tasks of a repository, a Flint, a project, a deliverable, or an address. |

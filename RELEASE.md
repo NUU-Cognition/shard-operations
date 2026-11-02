@@ -1,3 +1,7 @@
+# 0.3.3
+
+- NUU Ops removed the task types (operator page feedback, 2026-11-03): no `task.dev`, no stages, and no type fields. The model, the CLI knowledge, `sk-ops-use_operations`, and `sk-ops-create_task` lose `ops task stage|retype|field|commit`, `ops task type list|show`, `--type` and `--stage` of `ops task create` and `ops task list`, `tasks.setFields`, `tasks.setType`, `taskStages.set`, `taskTypes.list|get`, and the error codes of the stages and the types. `--repo` of `ops task create` adds a `repo` related link. A task address is `task/<id>`; an old `task.dev/<id>` address still finds the task.
+
 # 0.3.2
 
 - The facts of the two reviewers of ops-cli-publish-1023. `sk-ops-use_operations` and `knw-ops-cli` give `ops project link|unlink` (NUU Connect URIs, `connect_bad_request`), the references of `ops activity row` (also a notepad), the inputs of `ops people show` (not `me`), `groupId` in the JSON of `ops task group create|update`, the personal `ops day candidates` (`day_plan_personal_only`), and the hidden fields, caps, and `query_bad_cursor` of `ops query`.

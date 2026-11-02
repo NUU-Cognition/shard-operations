@@ -49,13 +49,13 @@ Create one task (or one subtask) in the right place, and check that Ops put it t
 
    - A subtask: `--parent <task>`, or `ops task subtask add <parent> "<title>" --json`. A tree has at most 6 levels below its root (`subtask_too_deep`).
    - A recurring task: `--every day|week|month`. Its next copy comes in the same place when it is done.
-   - A typed task: `--type task.dev --repo <name>`.
+   - The repository of the work: `--repo <name>` adds a `repo` related link.
    - For many tasks in one place, run one create for each task, in the order they must show. Do not use `--top` for a list: it writes a second gesture for each task.
 4. **Check the output.** The JSON has these fields:
 
    | Field | Check |
    |-------|-------|
-   | `id`, `address` | Keep both. The address is `@v1/<org>/task/<id>#ops` (`task.dev` for a typed task). |
+   | `id`, `address` | Keep both. The address is `@v1/<org>/task/<id>#ops`. |
    | `place` | `{kind, id, title, path, address}`: the place that you gave, or that the route picked |
    | `sectionId` | The section that holds the task (for `--section`, `--project`, `--deliverable`, and `--deployment`) |
    | `title` | The stored title. It is shorter when the title ended with a digit. |
