@@ -422,7 +422,7 @@ Module `subtasks` (D5). A subtask is a full task with a parent task (`parentTask
 | Attachment | table `task_attachments`: `session`, `fleet`, `note`, `repo` | A link from a task or a task group to a session, a fleet, a note, or a repository |
 | Stable key | table `task_keys`; `restoreKey` | The key never changes, also not at an undo or a redo. The rows of the tables above name the key, so an old ID still finds the task. |
 
-A task has no type and no stage. The task types (`task.dev`, its stages, and its fields `repo` and `wipCommits`) were removed on 2026-11-03 (operator page feedback). The state of a task is its status, its outcome, and its result: a session writes its commits and its session id in the result. The schema keeps the old fields and the tables `task_types` and `task_stage_events` only until `taskTypesRemoval:removeTaskTypes` has cleared them on each deployment.
+A task has no type and no stage. The task types (`task.dev`, its stages, and its fields `repo` and `wipCommits`) were removed on 2026-11-03 (operator page feedback). The state of a task is its status, its outcome, and its result: a session writes its commits and its session id in the result. A one-off migration cleared the old fields and deleted the tables `task_types` and `task_stage_events` on dev and on prod; its backup rows are in `applied_migrations` (`task-types-remove/backup/<n>`).
 
 **Rules.**
 
