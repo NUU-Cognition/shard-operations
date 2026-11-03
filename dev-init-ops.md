@@ -21,7 +21,7 @@ orbh-fleet: ops-command-1021
 
 This shard lets an agent work in the NUU Operations web app. The agent uses the `ops` CLI. The CLI calls the Operations agent gateway, and the gateway calls the same Convex functions that the web app calls. Thus an agent write has the same checks, the same activity log (Waybill) entries, and the same notifications as a write in the web app.
 
-Load this shard when a request touches Operations records: projects, deliverables, sections, tasks and subtasks, task groups, backlogs, deployments and their inboxes, deadlines, blockers, plans and plan steps, comments, notifications, activity, day labels, favourites, notepads, or the day planner.
+Load this shard when a request touches Operations records: projects, deliverables, sections, tasks and subtasks, task groups, review requests, backlogs, deployments and their inboxes, deadlines, blockers, plans and plan steps, comments, notifications, activity, day labels, favourites, notepads, or the day planner.
 
 **Start here: [[dev-sk-ops-use_operations]].** It is the main skill of this shard. It gives the model, the builds and the sign-in, the org, references and places, the command for each job, `ops query` and `ops call` for any other read or write, ten recipes, the safety rules, and troubleshooting. Follow it for any Operations request. The other skills and workflows go deeper on one job.
 

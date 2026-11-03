@@ -676,6 +676,47 @@ The CLI is `ops blocker list|show|create|update|attach|detach|delay|resolve|drop
 
 **The release.** The deployment link, the blocker address, and the re-point of a conversion are follow-ups of Task 376 (2026-10-23). They work after the next Ops release of Convex. A deployment of before that release refuses a deployment link (`agent_invalid_input`) and gives no `address`.
 
+## Review Queue
+
+Table `queue_items`. Module `reviews` (the helpers: `lib/reviews.ts`). Since Task 402 of the NUU Operations Flint. A queue item is one thing that waits for one person. Version 0.1 has one queue, `review`: a request that a person reviews a task. The table is generic: a later queue or a later kind of target needs no new table.
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `orgSlug` | string | |
+| `queue` | `"review"` | |
+| `target` | `{kind: "task", taskId, taskKey}` | The task, by its id at the write and its stable key (§ The Task Primitive). A read finds the task by the key, so an undo of a delete keeps the item. |
+| `targetKey` | string | `task:<restoreKey>`: the indexed form of the target |
+| `assigneeUserId` | `Id<"users">` | The reviewer. A member of the org (`assignee_not_member`). |
+| `requestedBy` | `Id<"users">`, optional | The requester. The agent of a person writes as that person. |
+| `requestedVia` | `{client?, session?, fleet?, actor?}`, optional | The agent mark of the request |
+| `note` | string, optional | What to check. At most 2000 characters (`review_note_too_long`). |
+| `state` | `"open"` \| `"resolved"` \| `"cancelled"` | |
+| `verdict` | `"approved"` \| `"changes"` \| `"dismissed"`, optional | The verdict of a resolved item |
+| `cancelReason` | `"withdrawn"` \| `"task_closed"` \| `"task_deleted"`, optional | |
+| `resolvedBy`, `resolvedNote`, `resolvedAt` | optional | The verdict note goes to the requester. |
+
+The task has a read cache, `review: {assigneeUserId, at}`: the oldest open request. Only `lib/reviews.ts` writes it. The rows of the web app show "In review" from it.
+
+**Rules.**
+
+1. With no reviewer, the reviewer is the owner of the task. A task with no owner takes the caller in a personal org, and refuses with `review_no_reviewer` in a team org. A done task refuses (`review_task_done`).
+2. One open request for each task and reviewer. A second request changes its note and its requester (`again: true`).
+3. Only the reviewer resolves (`review_not_reviewer`). `approved` closes the task as `completed`, unless `keepOpen`. `changes` keeps the task open, and opens a done task again. `dismissed` changes only the request.
+4. Only the requester cancels (`review_not_requester`). A closed request refuses a verdict and a cancel (`review_not_open`).
+5. A close of the task cancels its open requests (`task_closed`); a delete cancels them too (`task_deleted`). The write is in the same Waybill event, so an undo brings them back.
+6. Each write labels the scope of its task (`review.request`, `review.approve`, `review.changes`, `review.dismiss`, `review.cancel`), so the task timeline shows it and the undo of the task takes it back.
+7. The notifications are in the category `reviews`: `review.requested` to the reviewer, and `review.resolved` to the requester. A request of the agent of a person to that person notifies that person, from the agent.
+8. An org copy does not carry the table (it names the task ids and the users of one deployment). The org wipe deletes it.
+
+| Op | Args |
+|----|------|
+| `reviews.request` | `orgSlug, taskId, reviewerUserId?, note?` -> `{itemId, reviewerUserId, again}` |
+| `reviews.resolve` | `orgSlug, itemId, verdict, note?, keepOpen?` -> `{itemId, verdict, closed, reopened}` |
+| `reviews.cancel` | `orgSlug, itemId` -> `{itemId}` |
+| `reviews.mine` | `state?: "open"\|"all", orgSlug?` -> `{open, closed, truncated}`: every org of the caller, oldest first; each entry has its task summary and `href` |
+| `reviews.forTask` | `orgSlug, taskId` -> `{open, closed}` |
+| `reviews.openCount` | `{}` -> number (0 with no sign-in) |
+
 ## Plans and Steps
 
 Tables `plans` and `plan_nodes`. Module `plans`. A plan is a shared, org-level, left-to-right DAG of steps. It is edited until it is completed.
@@ -1137,6 +1178,9 @@ The gateway returns `{ok: false, error: {code, message, data?}}`. The codes belo
 | `task_text_conflict` | `expectedTitle` or `expectedBody` is stale | Read the task again |
 | `task_order_invalid`, `task_order_duplicate`, `task_order_incomplete` | Bad `tasks.reorder` list | Send one complete bucket |
 | `task_link_cycle` | A chain or a merge would make a loop | Choose other tasks |
+| `review_no_reviewer` | A review request of a task of a team with no owner | Name the reviewer |
+| `review_task_done`, `review_task_gone` | The task of a review request is done, or gone | Reopen the task, or read the queue again |
+| `review_not_reviewer`, `review_not_requester`, `review_not_open` | A verdict by a person who is not the reviewer, a cancel by a person who did not ask, or a request that is closed | Read the request (`reviews.forTask`) |
 | `promotion_deliverable_fixed`, `promotion_deliverable_required` | Bad promote target | See Sections § Conversion back |
 | `deployment_name_required` | A deployment with no name | Give a name |
 | `deployment_project_required` | `startDeliverable` for a deployment with no project, and no `projectId` | Give the project (`ops deployment start-deliverable --project <p>`) |

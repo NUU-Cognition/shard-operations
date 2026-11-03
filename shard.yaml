@@ -3,10 +3,10 @@ shard: "@nuucognition/operations"
 id: 132d001d-1972-4c14-8326-3598bd1fe00d
 source:
   id: 54a9b195-c150-4fb5-bd93-9d3e66536009
-version: "0.3.3"
+version: "0.4.0"
 name: Operations
 shorthand: ops
-description: Work in NUU Operations through the ops CLI — the main skill sk-ops-use_operations, projects, deliverables, sections, tasks and subtasks, task groups, deployments and their inboxes, the route decision, addresses, deadlines, blockers, plans and the plan canvas, notepads, day plans, and ops query.
+description: Work in NUU Operations through the ops CLI — the main skill sk-ops-use_operations, projects, deliverables, sections, tasks and subtasks, task groups, the review queue, deployments and their inboxes, the route decision, addresses, deadlines, blockers, plans and the plan canvas, notepads, day plans, and ops query.
 
 dependencies:
   "@nuucognition/flint": ""

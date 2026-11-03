@@ -1,3 +1,7 @@
+# 0.4.0
+
+- The review queue of NUU Ops (Task 402 of the NUU Operations Flint): a person or an agent asks a person to review a task, and the request goes into **Your Reviews** of the web app with a notification. The model (`knw-ops-data_model` § Review Queue: the table `queue_items`, the cache `tasks.review`, the rules, the ops `reviews.*`, and the codes), the CLI knowledge (`ops task review request|approve|changes|dismiss|cancel` and `ops review list`), and `sk-ops-use_operations` give it.
+
 # 0.3.3
 
 - NUU Ops removed the task types (operator page feedback, 2026-11-03): no `task.dev`, no stages, and no type fields. The model, the CLI knowledge, `sk-ops-use_operations`, and `sk-ops-create_task` lose `ops task stage|retype|field|commit`, `ops task type list|show`, `--type` and `--stage` of `ops task create` and `ops task list`, `tasks.setFields`, `tasks.setType`, `taskStages.set`, `taskTypes.list|get`, and the error codes of the stages and the types. `--repo` of `ops task create` adds a `repo` related link. A task address is `task/<id>`; an old `task.dev/<id>` address still finds the task.
