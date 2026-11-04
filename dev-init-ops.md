@@ -21,11 +21,11 @@ orbh-fleet: ops-command-1021
 
 This shard lets an agent work in the NUU Operations web app. The agent uses the `ops` CLI. The CLI calls the Operations agent gateway, and the gateway calls the same Convex functions that the web app calls. Thus an agent write has the same checks, the same activity log (Waybill) entries, and the same notifications as a write in the web app.
 
-Load this shard when a request touches Operations records: projects, deliverables, sections, tasks and subtasks, task groups, review requests, backlogs, deployments and their inboxes, deadlines, blockers, plans and plan steps, comments, notifications, activity, day labels, favourites, notepads, or the day planner.
+Load this shard when a request touches Operations records: projects, deliverables, sections, tasks and subtasks, task groups, review requests, the people looped into a task, backlogs, deployments and their inboxes, deadlines, blockers, plans and plan steps, comments, notifications, activity, day labels, favourites, notepads, or the day planner.
 
 **Start here: [[dev-sk-ops-use_operations]].** It is the main skill of this shard. It gives the model, the builds and the sign-in, the org, references and places, the command for each job, `ops query` and `ops call` for any other read or write, ten recipes, the safety rules, and troubleshooting. Follow it for any Operations request. The other skills and workflows go deeper on one job.
 
-For the task primitive of Task 1287 (outcomes, lineage, task groups, attachments) the Tasks shard has the depth: `flint shard start task`, then [[knw-task-cli]] and [[knw-task-model]].
+For the task primitive of Task 1287 (the close and the result, lineage, task groups, attachments) the Tasks shard has the depth: `flint shard start task`, then [[knw-task-cli]] and [[knw-task-model]].
 
 ## What Operations Is
 
@@ -40,7 +40,7 @@ Operations (Ops) is the delivery record of a person and of an organisation. The 
 7. Each project, deliverable, section, task, deployment, and notepad has an **address**: `@v1/<org>/<kind>/<key>#ops`. Every command prints it. Name a record by its address when you have it.
 8. **Deadlines** own dates and attach to records. **Plans** are graphs of steps across projects. **Notepads** hold text with task mentions.
 9. **Blockers** say why work waits: what it waits on, the next step, an owner, and the next check-up date. A blocker links records and gates no status. It is open, resolved, or dropped.
-10. A task has no type and no stage: its state is its status, its outcome, and its result. A **task group** is a set of tasks that are done together. A **day plan** is the ordered tasks of one person for one date.
+10. A task has no type, no stage, and no outcome: its state is its status and its result. The people **looped in** follow a task beside its owner and hear every comment. A **task group** is a set of tasks that are done together. A **day plan** is the ordered tasks of one person for one date.
 
 ```
 org

@@ -26,7 +26,7 @@ Read everything around one task in one command: where it lives, the tree that it
    | Question | Command |
    |----------|---------|
    | Where is this task, what tree is it in, and how is it linked to other tasks? | `ops task map <task> --json` |
-   | What are the facts of this one task: its type, stage, fields, outcome, body, attachments, and web link? | `ops task show <task> --json` |
+   | What are the facts of this one task: its status, owner, the people looped in, result, body, attachments, and web link? | `ops task show <task> --json` |
    | What must I know before I work on this task or report on it: its description, place, people, and comments? | `ops task context <task> --json` |
    | Only the subtree, with the done count? | `ops task subtask list <task> --json` |
 
@@ -48,7 +48,7 @@ Read everything around one task in one command: where it lives, the tree that it
 
    | Key | Text label | Meaning |
    |-----|------------|---------|
-   | `splitFrom` | split from | This task is a part of that task. The old task closed as `superseded`, unless it stayed open. |
+   | `splitFrom` | split from | This task is a part of that task. The old task closed, unless it stayed open. |
    | `splitInto` | split into | The parts that came from this task |
    | `mergedInto` | merged into | This task went into that task (the survivor) |
    | `absorbed` | absorbed | The tasks that went into this task |

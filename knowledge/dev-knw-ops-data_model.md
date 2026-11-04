@@ -301,7 +301,8 @@ Table `tasks`. Module `tasks`. One task model. The home decides where a task liv
 | `order` | number | Rank inside one order bucket (below) |
 | `createdBy`, `lastModifiedBy` | `Id<"users">`, optional | |
 | `completedAt` | number, optional | Set on the change to `done`, cleared on the change away from `done` |
-| `type`, `typeVersion`, `stage`, `fields`, `outcome`, `blocked`, `result`, `note` | optional | The task primitive. See § The Task Primitive. |
+| `blocked`, `result`, `note` | optional | The task primitive. See § The Task Primitive. |
+| `loopedIn` | `Id<"users">[]`, optional | The people looped into the task, in the order they came in. See § Looped In. |
 
 **The home.**
 
@@ -414,7 +415,7 @@ Module `subtasks` (D5). A subtask is a full task with a parent task (`parentTask
 | Part | Fields and tables | Rules |
 |------|-------------------|-------|
 | Status | `checkbox` | Every task has one: `todo`, `doing`, or `done`. `blocked` (`{reason, next?, at}`) is a read cache of the oldest open blocker that links the task (§ Blockers). |
-| Outcome | `outcome`: `"completed"` \| `"dropped"` \| `"superseded"` | Only on a done task. A close sets it (default `completed`). A reopen clears it. |
+| Result | `result`: string | What the done task produced: a sentence or a link. A close can set it. A reopen keeps it. |
 | Unplaced | `unplaced: true` | A task with no home. A normal state. |
 | Task group | tables `task_groups`, `task_group_members` | A set of tasks that are done together, usually in one session. A task can be in many groups. A group is open while one of its tasks is open. |
 | Lineage | table `task_links`: `split-from`, `merged-into`, `continues-from`, `after` | A link never deletes history. |
@@ -422,24 +423,26 @@ Module `subtasks` (D5). A subtask is a full task with a parent task (`parentTask
 | Attachment | table `task_attachments`: `session`, `fleet`, `note`, `repo` | A link from a task or a task group to a session, a fleet, a note, or a repository |
 | Stable key | table `task_keys`; `restoreKey` | The key never changes, also not at an undo or a redo. The rows of the tables above name the key, so an old ID still finds the task. |
 
-A task has no type and no stage. The task types (`task.dev`, its stages, and its fields `repo` and `wipCommits`) were removed on 2026-11-03 (operator page feedback). The state of a task is its status, its outcome, and its result: a session writes its commits and its session id in the result. A one-off migration cleared the old fields and deleted the tables `task_types` and `task_stage_events` on dev and on prod; its backup rows are in `applied_migrations` (`task-types-remove/backup/<n>`).
+A task has no type and no stage. The task types (`task.dev`, its stages, and its fields `repo` and `wipCommits`) were removed on 2026-11-03 (operator page feedback). The state of a task is its status and its result: a session writes its commits and its session id in the result. A one-off migration cleared the old fields and deleted the tables `task_types` and `task_stage_events` on dev and on prod; its backup rows are in `applied_migrations` (`task-types-remove/backup/<n>`).
+
+A task has no outcome. The field `outcome` (`completed`, `dropped`, or `superseded`) was removed on 2026-11-04 (operator page feedback): a done task is done. No code reads or writes it. `tasks.close` still takes `outcome` and ignores it, so an older CLI still closes a task. A one-off migration (`taskOutcomeRemoval:removeTaskOutcome`) clears the old field on each deployment. It writes each old value to a backup row of `applied_migrations` (`task-outcome-remove/backup/<n>`) first. A later schema change drops the field.
 
 **Rules.**
 
-1. A close sets the outcome: `completed` (the default), `dropped`, or `superseded`, at any time. `tasks.update` with `checkbox: "done"` sets `completed`.
-2. A reopen sets `doing` and clears `outcome`.
+1. A close sets the status `done` at any time, with an optional result.
+2. A reopen sets `doing`. It clears `completedAt` and keeps the result.
 3. A write is by an agent when its agent mark has a session (the CLI sends `ORBH_SESSION_ID`). The mark is provenance, not security.
 
 **Lineage.**
 
-- **Split** (`taskLinks.split`): each part is a new task with the home and the relations of the old task. The old task closes with `superseded`, unless `keepOpen`.
-- **Merge** (`taskLinks.merge`): each other task gets `merged-into → survivor`, and an open one closes with `superseded`.
-- **Continue** (`taskLinks.continue`): a new task with the home of the old task gets `continues-from → old`. An open old task closes with `superseded`.
+- **Split** (`taskLinks.split`): each part is a new task with the home and the relations of the old task. An open old task closes, unless `keepOpen`. A done old task stays as it is.
+- **Merge** (`taskLinks.merge`): each other task gets `merged-into → survivor`, and an open one closes.
+- **Continue** (`taskLinks.continue`): a new task with the home of the old task gets `continues-from → old`. An open old task closes. A done old task stays done.
 - **Chain** (`taskLinks.chain`): each task after the first gets `after → the task before it`. A cycle is refused (`task_link_cycle`). A task in a chain is ready when the task before it is done.
 
 | Op | Args |
 |----|------|
-| `tasks.close` / `reopen` | `orgSlug, taskId, outcome?, result?` / `orgSlug, taskId` |
+| `tasks.close` / `reopen` | `orgSlug, taskId, result?` / `orgSlug, taskId`. `close` still takes `outcome` and ignores it: do not send it. |
 | `tasks.listAll`, `listAllPage`, `listUnplaced`, `detail` | `orgSlug` and filters (`includeDone?, unplaced?, withSubtasks?`) / `orgSlug, taskId` |
 | `taskLinks.split`, `merge`, `continue`, `chain`, `unchain` | See Lineage |
 | `taskGroups.create`, `update`, `addTask`, `removeTask`, `remove`, `get`, `list` | `orgSlug, groupId?, title?, taskIds?` |
@@ -701,21 +704,51 @@ The task has a read cache, `review: {assigneeUserId, at}`: the oldest open reque
 
 1. With no reviewer, the reviewer is the owner of the task. A task with no owner takes the caller in a personal org, and refuses with `review_no_reviewer` in a team org. A done task refuses (`review_task_done`).
 2. One open request for each task and reviewer. A second request changes its note and its requester (`again: true`).
-3. Only the reviewer resolves (`review_not_reviewer`). `approved` closes the task as `completed`, unless `keepOpen`. `changes` keeps the task open, and opens a done task again. `dismissed` changes only the request.
+3. Only the reviewer resolves (`review_not_reviewer`). `approved` closes the task, unless `keepOpen`. `changes` keeps the task open, and opens a done task again. `dismissed` changes only the request.
 4. Only the requester cancels (`review_not_requester`). A closed request refuses a verdict and a cancel (`review_not_open`).
 5. A close of the task cancels its open requests (`task_closed`); a delete cancels them too (`task_deleted`). The write is in the same Waybill event, so an undo brings them back.
 6. Each write labels the scope of its task (`review.request`, `review.approve`, `review.changes`, `review.dismiss`, `review.cancel`), so the task timeline shows it and the undo of the task takes it back.
 7. The notifications are in the category `reviews`: `review.requested` to the reviewer, and `review.resolved` to the requester. A request of the agent of a person to that person notifies that person, from the agent.
 8. An org copy does not carry the table (it names the task ids and the users of one deployment). The org wipe deletes it.
+9. A request loops the reviewer into the task (§ Looped In), unless the reviewer is the owner. The reviewer then hears every comment on the task.
 
 | Op | Args |
 |----|------|
 | `reviews.request` | `orgSlug, taskId, reviewerUserId?, note?` -> `{itemId, reviewerUserId, again}` |
 | `reviews.resolve` | `orgSlug, itemId, verdict, note?, keepOpen?` -> `{itemId, verdict, closed, reopened}` |
 | `reviews.cancel` | `orgSlug, itemId` -> `{itemId}` |
-| `reviews.mine` | `state?: "open"\|"all", orgSlug?` -> `{open, closed, truncated}`: every org of the caller, oldest first; each entry has its task summary and `href` |
+| `reviews.mine` | `state?: "open"\|"all", orgSlug?` -> `{open, closed, sent, truncated}`: every org of the caller, oldest first; each entry has its task summary and `href`. `sent` is the open requests that the caller asked of other people, oldest first (index `by_requester_state`); a request to oneself is in `open`. The web app shows `sent` in **Your Reviews** as "You asked for". |
 | `reviews.forTask` | `orgSlug, taskId` -> `{open, closed}` |
 | `reviews.openCount` | `{}` -> number (0 with no sign-in) |
+
+## Looped In
+
+Field `tasks.loopedIn`. Module `taskLoops` (the helpers: `lib/taskLoops.ts`). Since amendment 1 of Task 402 of the NUU Operations Flint. The people looped into a task follow it beside its owner. Each one hears every comment on the task.
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `loopedIn` | `Id<"users">[]`, optional | The users IDs, in the order they came in. Absent when no person is looped in. Only `lib/taskLoops.ts` writes it. `agent.getTask` gives it as `task.loopedIn`. |
+
+**Who loops a person in.**
+
+- A person, with the field "Looped in" of the task dialog or with `ops task loop add` (`taskLoops.add`). The person gets the notification `task.loopedIn` (category `tasks`), unless the person did it.
+- A review request: it loops in the reviewer, unless the reviewer is the owner (§ Review Queue).
+- A mention in a comment: it loops in each mentioned member of the org of the task. The author and the owner are not looped in. A person outside the org is not looped in. The mention of an edit loops no one in. The mention notice is the only notice.
+
+**Rules.**
+
+1. A task loops in at most 50 people (`loop_full`).
+2. `add` takes a member of the org (`assignee_not_found`, `assignee_not_member`). A person in the loop already changes nothing (`added: false`).
+3. Any member who may write takes a person out (`remove`), the person too. A person who is not in the loop changes nothing (`removed: false`).
+4. The people looped in are participants of the comments (`participantsOf` in `convex/updates.ts`): each one gets `update.comment` for each comment on the task.
+5. Each write labels the scope of its task (`task.loopIn`, `task.loopOut`), so the task timeline shows it and the undo of the task takes it back.
+
+| Op | Args |
+|----|------|
+| `taskLoops.add` | `orgSlug, taskId, userId` -> `{added}` |
+| `taskLoops.remove` | `orgSlug, taskId, userId` -> `{removed}` |
+
+The CLI is `ops task loop add|remove <task> <person>`, and `ops task show` names the people looped in ([[dev-knw-ops-cli]]).
 
 ## Plans and Steps
 
@@ -807,7 +840,7 @@ Module `updates` (a Webcore component). Only tasks carry comments. A comment tar
 | `updates.react` / `unreact` | `target, id, emoji` |
 | `updates.people` | `orgSlug` |
 
-A mention is `{id: "user:<clerkUserId>", name, handle?}`. Comments are not in Waybill, so undo does not reach them. The owner and the creator of the task get `update.comment`; a mentioned person gets `update.mention`. Errors: `updates_target`, `updates_tenant`, `task_not_found`.
+A mention is `{id: "user:<clerkUserId>", name, handle?}`. Comments are not in Waybill, so undo does not reach them. The owner, the creator, and the people looped into the task (§ Looped In) get `update.comment`; a mentioned person gets `update.mention`. A mention of a member of the org loops that member into the task. Errors: `updates_target`, `updates_tenant`, `task_not_found`.
 
 ## Notifications
 
@@ -823,7 +856,7 @@ Module `notifications` (a Webcore component). Every op acts on the caller's own 
 | `notifications.dismiss` | `id` |
 | `notifications.preferences` / `setPreference` | — / `category, channel?, enabled` |
 
-`tenant` is an `orgSlug`. Categories: `tasks`, `deadlines`, `plans`, `updates`. Channels: `inapp`, `push`. Types: `task.assigned`, `task.moved`, `deadline.assigned`, `deadline.due`, `plan.step.assigned`, `update.comment`, `update.mention`. Collapse keys: `task:<id>`, `deadline:<id>`, `deadline-due:<id>`, `plan-node:<id>`. Nobody gets a notification for their own action.
+`tenant` is an `orgSlug`. Categories: `tasks`, `deadlines`, `plans`, `updates`. Channels: `inapp`, `push`. Types: `task.assigned`, `task.moved`, `task.loopedIn`, `deadline.assigned`, `deadline.due`, `plan.step.assigned`, `update.comment`, `update.mention`. Collapse keys: `task:<id>`, `deadline:<id>`, `deadline-due:<id>`, `plan-node:<id>`. Nobody gets a notification for their own action.
 
 ## Activity Log (Waybill)
 
@@ -1151,7 +1184,7 @@ The gateway returns `{ok: false, error: {code, message, data?}}`. The codes belo
 | `agent_invalid_input` | Bad args for the op | Check the field names and types of the Convex function |
 | `org_unauthorized` | The caller is not a member of the org | Check `--org` |
 | `org_frozen` | The org is frozen for a migration | Wait; reads still work |
-| `assignee_not_found`, `assignee_not_member` | The owner or assignee is not a member | Use `users.listAll` |
+| `assignee_not_found`, `assignee_not_member` | The owner, the assignee, the reviewer, or a person to loop in is not a member | Use `users.listAll` |
 | `project_not_found`, `deliverable_not_found`, `section_not_found`, `subsection_not_found`, `task_not_found`, `deadline_not_found`, `plan_not_found`, `node_not_found`, `deployment_not_found`, `task_group_not_found`, `backlog_folder_not_found` | No such record in this org | Check the ID and the org |
 | `subsection_blocked` | An upstream section is not done | Finish the blockers named in the message |
 | `dependency_order_invalid` | Sections: a dependency points down in its home. Deadlines: a date before a required deadline. | Reorder, or fix the dates |
@@ -1181,6 +1214,7 @@ The gateway returns `{ok: false, error: {code, message, data?}}`. The codes belo
 | `review_no_reviewer` | A review request of a task of a team with no owner | Name the reviewer |
 | `review_task_done`, `review_task_gone` | The task of a review request is done, or gone | Reopen the task, or read the queue again |
 | `review_not_reviewer`, `review_not_requester`, `review_not_open` | A verdict by a person who is not the reviewer, a cancel by a person who did not ask, or a request that is closed | Read the request (`reviews.forTask`) |
+| `loop_full` | A task that loops in 50 people already | Take a person out first (`taskLoops.remove`) |
 | `promotion_deliverable_fixed`, `promotion_deliverable_required` | Bad promote target | See Sections § Conversion back |
 | `deployment_name_required` | A deployment with no name | Give a name |
 | `deployment_project_required` | `startDeliverable` for a deployment with no project, and no `projectId` | Give the project (`ops deployment start-deliverable --project <p>`) |

@@ -342,23 +342,25 @@ reads stdin.
 | `ops task list [--project \| --deliverable \| --section \| --deployment \| --master \| --mine [--all-orgs]] [--backlog] [--status open\|todo\|doing\|done\|all] [--priority <p\|none>] [--owner <me\|member\|none>] [--limit n]` — root tasks, each with its place and address; `--section` keeps the order of the section and gives the subtask counts (`sections.tasks`); `--deployment` lists the inbox (`deployments.inbox`); default `--status open`; more than one scope flag is a usage error | `ops task list --section "Alpha › v1 › Backend" --status all` |
 | `ops task list --all [--status …] [--limit n]` — every task of the org, placed and unplaced, newest first, as task summaries (address, home label); `--limit` is the total (default 200) | `ops task list --all --status done --json` |
 | `ops task list --unplaced [--status …] [--limit n]` — the tasks with no home; when the tasks need more bytes than one read (`task_read_too_large`), the CLI reads the pages of `tasks.listAllPage`; a page that is not the last and does not move the cursor stops the list (`pagination_stalled`, exit 1, no rows) | `ops task list --unplaced` |
-| `ops task show <task>` — also the address, the parent, the subtasks (the tree with the done count; `--json`: `subtasks`), the outcome, the lineage, the task groups, the related links, and the attachments; when the incoming lineage stops at its byte budget, `--json` has `linksCut: true` and the text says so; a task with a Flint task note gives the lines `note` (the label, else the address) and `note link` (the open link), and `--json` has `note`, `noteLabel`, and `noteUrl` at the top (each `null` when the task has no note); the open review requests (the reviewer, the requester, the age, and the note; `--json`: `reviews: {open, closed}`, from `reviews.forTask`; a deployment without the op gives no `reviews`) | `ops task show @v1/test/task/<id>#ops` |
+| `ops task show <task>` — also the address, the parent, the people looped in (a `looped in` line with each name and users ID; `--json`: `loopedIn: [{userId, name}]`, `name` is `null` for a person who is not a member; an empty list when no person is looped in), the subtasks (the tree with the done count; `--json`: `subtasks`), the lineage, the task groups, the related links, and the attachments; when the incoming lineage stops at its byte budget, `--json` has `linksCut: true` and the text says so; a task with a Flint task note gives the lines `note` (the label, else the address) and `note link` (the open link), and `--json` has `note`, `noteLabel`, and `noteUrl` at the top (each `null` when the task has no note); the open review requests (the reviewer, the requester, the age, and the note; `--json`: `reviews: {open, closed}`, from `reviews.forTask`; a deployment without the op gives no `reviews`) | `ops task show @v1/test/task/<id>#ops` |
 | `ops task context <task> [--comments <n>]` — the full context of a task for an agent: the description, the place, the people, and the comments (no change events); `--comments` keeps the newest n (1 to 500, default 200). Read it before you work on a task | `ops task context <taskId> --comments 20 --json` |
 | `ops task search <query> [--limit 1-100]` | `ops task search docs --limit 5` |
 | `ops task create <title> [--section <s> \| --project <p> \| --deliverable <d> \| --deployment <d> \| --parent <task> \| --route [text] \| --master \| --unplaced] [--tag feedback\|hotfix\|ongoing\|recurring] [--every day\|week\|month] [--repo <name>] [--note <address> [--note-label <text>]] [--body <md\|-> \| --body-file <path>] [--priority low\|medium\|high\|urgent] [--assign <me\|member>] [--top]` — default: the master backlog, at the end; `--project` is its backlog section, `--deliverable` its first open section, `--deployment` its inbox, `--parent` a subtask; `--route` asks `route.suggest` with the text (default: the title) and prints the place, the score, and the reason; `--repo` adds a `repo` related link (`taskRelations.add`); the output gives the stored title (a trailing digit of the title is the rarity: "Fix login 1" is stored as "Fix login"), the address, and the section | `ops task create "Login fails on Safari" --deployment Production --tag hotfix` |
 | `ops task update <task> [--title] [--body <md\|-> \| --body-file <path>] [--priority <p\|none>] [--assign <member\|none>] [--rarity <1-7\|none>] [--tag <tag\|none>] [--every day\|week\|month\|none]` — `--tag` and `--every` need `tasks.update` with `tag` and `recurrence` (MODEL; a deployment without them refuses with `agent_invalid_input`) | `ops task update "Write docs" --body-file notes.md` |
 | `ops task start <task>` — doing | `ops task start "Write docs"` |
-| `ops task done <task>` — the same as `close` with the outcome `completed` | `ops task done "Write docs"` |
-| `ops task reopen <task>` — doing; the outcome goes | `ops task reopen "Write docs"` |
+| `ops task done <task>` — the same as `close` with no result | `ops task done "Write docs"` |
+| `ops task reopen <task>` — doing | `ops task reopen "Write docs"` |
 | `ops task move <tasks...> --to <place> [--priority <p\|none>]` — one task: `tasks.move`; more tasks: `tasks.moveMany`; each takes its subtree; the places are in [Places](#places---to-of-task-move); the former `--subsection`, `--backlog`, and `--folder` still work, hidden | `ops task move <a> <b> --to section:"Alpha › v1 › Backend"` |
 | `ops task reorder <task> (--before <t>\|--after <t>\|--top\|--bottom)` | `ops task reorder "Write docs" --after "Draft outline"` |
 | `ops task delete <task> [--with-subtasks]` — the service refuses a task with subtasks without the flag (`task_has_subtasks`) | `ops task delete "Write docs"` |
 | `ops task to-section <task> [--deliverable <d>]` — `to-subsection` is its former name | `ops task to-section "Big item" --deliverable "v1 launch"` |
-| `ops task review request <task> [--to <member>] [--note <md\|->]` — `reviews.request`: ask a person to review the task (see [review](#review)); `--to` takes a member as `--assign` does; with no `--to`, the reviewer is the owner of the task (a task with no owner: you in the personal workspace, `review_no_reviewer` in a team org); a second request to the same reviewer while one is open changes its note, and the text says `again`; `--json`: `{itemId, id, orgSlug, reviewerUserId, again, note?}` | `ops task review request <task> --to @ana --note "Check the copy"` |
-| `ops task review approve <task> [--note <md\|->] [--keep-open]` — `reviews.resolve` with the verdict `approved` on the open request where you are the reviewer; the task closes as `completed`, unless `--keep-open`; the note goes to the requester; `--json`: `{itemId, id, orgSlug, verdict, closed, reopened, note?}` | `ops task review approve <task>` |
+| `ops task review request <task> [--to <member>] [--note <md\|->]` — `reviews.request`: ask a person to review the task (see [review](#review)); `--to` takes a member as `--assign` does; with no `--to`, the reviewer is the owner of the task (a task with no owner: you in the personal workspace, `review_no_reviewer` in a team org); a second request to the same reviewer while one is open changes its note, and the text says `again`; the request loops the reviewer into the task (see `ops task loop`), unless the reviewer is the owner; `--json`: `{itemId, id, orgSlug, reviewerUserId, again, note?}` | `ops task review request <task> --to @ana --note "Check the copy"` |
+| `ops task review approve <task> [--note <md\|->] [--keep-open]` — `reviews.resolve` with the verdict `approved` on the open request where you are the reviewer; the task closes, unless `--keep-open`; the note goes to the requester; `--json`: `{itemId, id, orgSlug, verdict, closed, reopened, note?}` | `ops task review approve <task>` |
 | `ops task review changes <task> [--note <md\|->]` — the verdict `changes`: the task stays open, and a done task opens again (`reopened: true`) | `ops task review changes <task> --note "The redirect fails on Safari."` |
 | `ops task review dismiss <task> [--note <md\|->]` — the verdict `dismissed`: the task does not change | `ops task review dismiss <task>` |
 | `ops task review cancel <task> [--to <member>]` — `reviews.cancel`: withdraw the open request that you made; when you asked more than one reviewer, `--to` names the reviewer (else `review_ambiguous`, exit 2, with the reviewers as candidates); `--json`: `{itemId, id, orgSlug, reviewerUserId, cancelled: true}` | `ops task review cancel <task>` |
+| `ops task loop add <task> <person>` — `taskLoops.add`: loop a member of the org into the task; the person follows the task beside its owner, hears every comment on it, and gets a notification; `<person>` takes `me` or a member as `--assign` does; a person in the loop already gives `no change`; a task loops in at most 50 people (`loop_full`); a review request loops in the reviewer, and a mention in a comment loops in the mentioned member; `--json`: `{id, orgSlug, userId, added}` | `ops task loop add <task> @ana` |
+| `ops task loop remove <task> <person>` — `taskLoops.remove`: take a person out of the loop of the task; a person who is not in it gives `no change`; `--json`: `{id, orgSlug, userId, removed}` | `ops task loop remove <task> @ana` |
 
 #### Subtasks and the task map
 
@@ -382,26 +384,27 @@ unplaced task has no order bucket: `ops task reorder` refuses it
 
 #### The task primitive v0.1 ((Task) 1287 of the NUU Flint)
 
-A task has one status (`todo`, `doing`, `done`). A done task has one
-outcome: `completed`, `dropped`, or `superseded`. A task has no type and
-no stage: each task has the address `@v1/<org>/task/<id>#ops`, and a task
-closes as `completed` at any time. A write is by an agent when
+A task has one status (`todo`, `doing`, `done`). A done task can have a
+result. A task has no outcome (removed 2026-11-04): a done task is done.
+The CLI sends no outcome; `--outcome` is an unknown option. A task has no
+type and no stage: each task has the address `@v1/<org>/task/<id>#ops`,
+and a task closes at any time. A write is by an agent when
 `ORBH_SESSION_ID` is set (the CLI sends it as `X-Agent-Session`). A task
 has 0 or 1 home and 0 or more related links. A task with no home is
 **unplaced**, and that is normal.
 
 | Command | Example |
 |---|---|
-| `ops task close <task> [--outcome completed\|dropped\|superseded] [--result <md\|->]` — `tasks.close`; default `completed` | `ops task close <task> --outcome dropped` |
+| `ops task close <task> [--result <md\|->]` — `tasks.close`: the status `done`, with an optional result; `--json`: `{id, checkbox: "done", result?}` | `ops task close <task> --result "The pin works on dev."` |
 | `ops task result <task> <md\|->` — `""` clears it | `ops task result <task> "The pin works on dev."` |
 | `ops task note <task> <address> [--label <text>]` / `ops task note <task> --clear` — `tasks.setNote` ((Task) 1291): the Flint task note holds the content, and Ops keeps its address, `@v1/<org>/task/<note id>#flint/<flint>` (`flint resolve @v1//task/<n> --json` gives it); a new address with no `--label` clears the label; `--json` gives `{taskId, address, note, noteLabel, noteUrl}`; `noteUrl` is `obsidian://nuu-flint?address=` and the encoded note address, and the NUU Flint plugin opens it; a wrong address refuses with `task_note_invalid` | `ops task note <task> @v1/nuucognition/task/<uuid>#flint/nuu-flint --label "Task 1291 · NUU Flint"` |
 | `ops task home <task> (--section <s> \| --backlog [--project <p>] [--folder <f>] \| --none)` — `tasks.home`; `--project` and `--folder` imply `--backlog`; `--backlog` alone is the master backlog; `--none` unplaces the task; for a deliverable, a deployment, or a parent, use `ops task move --to` | `ops task home <task> --backlog --project Alpha` |
 | `ops task relate <task> <kind> <ref> [--label <text>]` — kinds: `project`, `deliverable` (an ID, URL, or title), `repo` (a name), `flint` (a Flint id), `address` (a v1 address); a second relate changes only the label | `ops task relate <task> repo main` |
 | `ops task unrelate <task> <kind> <ref>` | `ops task unrelate <task> project Alpha` |
 | `ops task hints [--flint <id>] [--repo <name>] [--text <text>]` — proposed homes from a Flint, a repository, or a text, best first; each line ends with the flags for `ops task home`; for a text, `ops route` is the decision of the revamp | `ops task hints --text "Fix the login page"` |
-| `ops task split <task> --part <title> [--part <title> ...] [--keep-open]` — the parts get the home and the related links; the old task closes as `superseded` | `ops task split <task> --part Backend --part Frontend` |
-| `ops task merge <task> <task>... (--into <task> \| --title <title>)` — the open absorbed tasks close as `superseded` | `ops task merge <a> <b> --into <c>` |
-| `ops task continue <task> [--title <title>]` — default title `<old title> (continued)`; an open old task closes as `superseded` | `ops task continue <task>` |
+| `ops task split <task> --part <title> [--part <title> ...] [--keep-open]` — the parts get the home and the related links; an open old task closes, unless `--keep-open` | `ops task split <task> --part Backend --part Frontend` |
+| `ops task merge <task> <task>... (--into <task> \| --title <title>)` — the open absorbed tasks close | `ops task merge <a> <b> --into <c>` |
+| `ops task continue <task> [--title <title>]` — default title `<old title> (continued)`; an open old task closes | `ops task continue <task>` |
 | `ops task chain <task> <task> [<task>...]` — in order; a task is ready when the task before it is done | `ops task chain <first> <second> <third>` |
 | `ops task unchain <task>` — removes the `after` link of the task | `ops task unchain <task>` |
 | `ops task attach <target> <kind> <ref> [--session-id <id>] [--label <text>] [--state <state>]` — the target is a task or a task group (an ID or an address; a title names a task); kinds: `session`, `fleet`, `note`, `repo`; a second attach updates the label and the state | `ops task attach <address> session <session address> --session-id <id> --state working` |
@@ -526,28 +529,34 @@ Facts of the Task 376 follow-ups (2026-10-23):
 
 The review queue (Task 402 of the NUU Operations Flint). A person or an
 agent asks a person to review a task (`ops task review request`). The
-request goes to the review queue of the reviewer. The reviewer approves the
-work, asks for changes, or dismisses the request (`ops task review
-approve|changes|dismiss`). The requester can cancel it (`ops task review
-cancel`). These verbs take the task, not the request: the CLI reads the
-open requests of the task (`reviews.forTask`) and takes the one where you
-are the reviewer (a verdict) or the requester (a cancel). When no request
-matches, the verb is a usage error (exit 2) and writes nothing. A note has
-at most 2000 characters; `--note -` reads stdin.
+request goes to the review queue of the reviewer. The request also loops
+the reviewer into the task (`ops task loop`), unless the reviewer is the
+owner. The reviewer approves the work, asks for changes, or dismisses the
+request (`ops task review approve|changes|dismiss`). The requester can
+cancel it (`ops task review cancel`). Your queue also lists the open
+requests that you asked of other people. These verbs take the task, not
+the request: the CLI reads the open requests of the task
+(`reviews.forTask`) and takes the one where you are the reviewer (a
+verdict) or the requester (a cancel). When no request matches, the verb is
+a usage error (exit 2) and writes nothing. A note has at most 2000
+characters; `--note -` reads stdin.
 
 | Command | Example |
 |---|---|
-| `ops review list [--org <org>] [--state open\|all]` — `reviews.mine`: your queue; the queue is personal, so with no `--org` it lists every org of yours (the stored default org does not apply); `--org` keeps one org; one line for each open request, oldest first: the age, the task title, the home label (or `unplaced`), the requester, and the task address; `--state all` adds the newest closed requests (at most 25) with the verdict, newest first; when the queue has more than 200 open requests, a last line says so; `--json`: `{open, closed, truncated}` as the service gives it (each entry is a request with `task` and `href`) | `ops review list --state all` |
+| `ops review list [--org <org>] [--state open\|all]` — `reviews.mine`: your queue; the queue is personal, so with no `--org` it lists every org of yours (the stored default org does not apply); `--org` keeps one org; one line for each open request, oldest first: the age, the task title, the home label (or `unplaced`), the requester, and the task address; when the queue has more than 200 open requests, a line says so; then, when you asked other people for reviews that are still open, the section `you asked for (open, oldest first)` gives one line for each, with the reviewer (`to <name>`) in place of the requester; `--state all` adds the newest closed requests (at most 25) with the verdict, newest first; `--json`: `{open, closed, sent, truncated}` as the service gives it (`sent` is the open requests that you asked of other people; each entry is a request with `task` and `href`; a deployment before `sent` has no field) | `ops review list --state all` |
 
 Codes from the service: `review_not_found`, `review_not_open` (the request
 is closed already), `review_not_reviewer` (only the reviewer gives the
 verdict), `review_not_requester` (only the requester cancels; the reviewer
 dismisses), `review_no_reviewer` (a team task with no owner: pass `--to`),
 `review_task_done` (reopen the task first), `review_task_gone`,
-`review_note_too_long`, and `assignee_not_member` (the reviewer). The client
-code `review_ambiguous` is a cancel that matches two requests. The ops are
-new on dev data: on a deployment without them, the error says that they are
-not deployed yet, and `ops task show` gives no review requests.
+`review_note_too_long`, and `assignee_not_member` (the reviewer). `ops task
+loop add` can refuse with `loop_full` (a task loops in at most 50 people:
+take a person out first), `assignee_not_found`, or `assignee_not_member`
+(the person). The client code `review_ambiguous` is a cancel that matches
+two requests. The ops are new on dev data: on a deployment without them,
+the error says that they are not deployed yet, and `ops task show` gives no
+review requests.
 
 ### plan
 

@@ -1,3 +1,9 @@
+# 0.5.0
+
+- NUU Ops removed the task outcome (operator page feedback, 2026-11-04): a done task is done, with an optional result. No `completed`, `dropped`, or `superseded`. `ops task close` loses `--outcome` and takes only `--result`; `ops task done` sends no outcome; `ops task show` shows no outcome. Split, merge, and continue close the open old task. `tasks.close` still takes `outcome` and ignores it, so an older CLI still works. The model (`knw-ops-data_model` § The Task Primitive), the CLI knowledge, `sk-ops-use_operations`, `sk-ops-read_task_map`, and the init lose the outcome.
+- Looped In (amendment 1 of Task 402 of the NUU Operations Flint): the people looped into a task follow it beside its owner, and each one hears every comment. A review request loops in the reviewer, and a mention in a comment loops in the mentioned member. The model (`knw-ops-data_model` § Looped In: the field `tasks.loopedIn`, the ops `taskLoops.add|remove`, the rules, and the code `loop_full`), the CLI knowledge (`ops task loop add|remove <task> <person>`, and the `looped in` line and `loopedIn` of `ops task show`), and `sk-ops-use_operations` give it.
+- **Your Reviews** lists the open requests that you asked of other people ("You asked for"). `reviews.mine` gives them as `sent`, and `ops review list` shows them in the section `you asked for`.
+
 # 0.4.0
 
 - The review queue of NUU Ops (Task 402 of the NUU Operations Flint): a person or an agent asks a person to review a task, and the request goes into **Your Reviews** of the web app with a notification. The model (`knw-ops-data_model` § Review Queue: the table `queue_items`, the cache `tasks.review`, the rules, the ops `reviews.*`, and the codes), the CLI knowledge (`ops task review request|approve|changes|dismiss|cancel` and `ops review list`), and `sk-ops-use_operations` give it.
