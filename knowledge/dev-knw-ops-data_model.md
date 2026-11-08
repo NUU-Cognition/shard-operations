@@ -29,7 +29,7 @@ Org (orgSlug)
   │     └── Deployment (live, paused, retired) ── its inbox section (role inbox) ── tasks with a tag
   ├── Deployments with no project ── each with its inbox section
   ├── Unplaced tasks (no home)
-  ├── Deadlines, Blockers, Plans and steps, Day labels, Notepads
+  ├── Deadlines, Blockers, Plans and steps, Notepads
   ├── Streams (Trident) ── stream steps, substreams, drawings; Trident workspaces (one person)
   ├── Calendars ── events (timed, all-day, periods) ── links to tasks and deadlines
   ├── Shares (a project, a deliverable, or a task, to another org or one person)
@@ -401,7 +401,7 @@ Placement errors: `task_folder_in_subsection`, `task_subsection_required`, `task
 | `agent.getTask` | `orgSlug, taskId` | `{task, breadcrumb}` or `null` |
 | `agent.searchTasks` | `orgSlug, query, limit?` | `{results, truncated}`; `limit` default 25, maximum 100. See [[dev-knw-ops-cli]] for the result fields. |
 | `agent.taskContext` | `taskId, orgSlug?, commentLimit?` | The full context of one task in one call: the row with `body`, the breadcrumb, the project description, the owner and creator names, the web path, and the comments with no Waybill event. |
-| `agent.resolve` | `id, orgSlug?` | `{kind, id, orgSlug, title, record, breadcrumb}` or `null`. Kinds: `project`, `deliverable`, `subsection`, `task`, `backlog-folder`, `plan`, `plan-node`, `deadline`, `day-label`, `deployment`. |
+| `agent.resolve` | `id, orgSlug?` | `{kind, id, orgSlug, title, record, breadcrumb}` or `null`. Kinds: `project`, `deliverable`, `subsection`, `task`, `backlog-folder`, `plan`, `plan-node`, `deadline`, `deployment`, `taskgroup`, `blocker`, `notepad`. |
 | `tasks.create` | `orgSlug, title, sectionId?, subsectionId?, projectId?, deliverableId?, parentTaskId?, unplaced?, body?, priority?\|null, tag?, recurrence?, ownerUserId?, folderId?, position?, type?, fields?, stage?, note?, noteLabel?` | `position`: `"end"` (default) or `"after-progress"` (just below the last `doing` or `done` task) |
 | `tasks.update` | `orgSlug, taskId, title?, body?, expectedTitle?, expectedBody?, priority?\|null, checkbox?, ownerUserId?\|null, rarity?\|null, blocked?\|null, result?\|null` | `expectedTitle`/`expectedBody` guard a text edit: a mismatch gives `task_text_conflict` |
 | `tasks.move` | `orgSlug, taskId, to` | See Move |
@@ -692,7 +692,7 @@ Each text (title, waiting on, next step, note) has at most 500 characters (`bloc
 7. A conversion (a task to a section, a section to a task) moves each blocker link of the consumed record to its successor, in open and closed blockers (`repointWraps`). When the successor is a task, an open blocker writes its `blocked` cache.
 8. A link reads the status of its record through the wrap resolver. A deployment reads as `doing` when it is live, `todo` when it is paused, and `done` when it is retired. A deleted record gives a broken link (`broken: true`). `detach` removes a broken link.
 9. A blocker has the id address `@v1/<org>/blocker/<id>#ops` (§ Addresses). Each read (`list`, `get`, `forRecord`) gives it as `address`. `agent.resolve` reads it.
-10. **Each blocker write is a Waybill gesture** (checked in `convex/blockers.ts`: each public mutation comes from the `waybill` wrapper and calls `ctx.journal.label`). The scope is the org: `org:<orgSlug>`. The actions are `blocker.create`, `blocker.edit`, `blocker.attach` or `blocker.links`, `blocker.detach`, `blocker.delay`, `blocker.resolve`, `blocker.drop`, `blocker.reopen`, and `blocker.delete`; each targets `{type: "blocker", id}`. So the activity feed of the org shows them, and `ops history --scope org:<org>` then `ops undo --scope org:<org> --expect <seq>` replays one. The CLI maps no blocker to a scope for `--on`: use `--scope org:<org>`. The scope `org:<org>` also holds the other org gestures (deadlines, day labels, deployments): read the head entry before an undo. A delete is still final in the CLI (`blocker delete` says it cannot be undone): prefer `resolve` or `drop`.
+10. **Each blocker write is a Waybill gesture** (checked in `convex/blockers.ts`: each public mutation comes from the `waybill` wrapper and calls `ctx.journal.label`). The scope is the org: `org:<orgSlug>`. The actions are `blocker.create`, `blocker.edit`, `blocker.attach` or `blocker.links`, `blocker.detach`, `blocker.delay`, `blocker.resolve`, `blocker.drop`, `blocker.reopen`, and `blocker.delete`; each targets `{type: "blocker", id}`. So the activity feed of the org shows them, and `ops history --scope org:<org>` then `ops undo --scope org:<org> --expect <seq>` replays one. The CLI maps no blocker to a scope for `--on`: use `--scope org:<org>`. The scope `org:<org>` also holds the other org gestures (deadlines, deployments): read the head entry before an undo. A delete is still final in the CLI (`blocker delete` says it cannot be undone): prefer `resolve` or `drop`.
 
 | Op | Args | Notes |
 |----|------|-------|
@@ -1137,15 +1137,7 @@ Limits: `plans.create` is not on the stack. `plans.remove` and `projects.remove`
 
 ## Day Labels
 
-Table `day_labels`. Module `dayLabels`. Banners across calendar days. Presentation only.
-
-| Field | Notes |
-|-------|-------|
-| `label` | Trimmed, not empty |
-| `startDate`, `endDate` | `YYYY-MM-DD`, inclusive, `endDate >= startDate` |
-| `color` | `water`, `fire`, `earth`, `air`, `sun`, `moon`, `muted` |
-
-Ops: `dayLabels.listByOrg(orgSlug)`, `create(orgSlug, label, startDate, endDate, color)`, `update(orgSlug, dayLabelId, label?, startDate?, endDate?, color?)`, `remove(orgSlug, dayLabelId)`.
+Day labels are gone (Task 390 of the NUU Operations Flint). The conversion `dayLabelsToEvents:convert` turns each label into an all-day event of the oldest calendar of its workspace (§ Calendars and Events). The module `dayLabels`, its ops, and `ops day-label` are removed. The table `day_labels` stays in the schema, empty, until prod runs the conversion. For a label on a range of days, make an all-day event: `ops event create <label> --date <first day> --until <last day>`.
 
 ## Notepads
 

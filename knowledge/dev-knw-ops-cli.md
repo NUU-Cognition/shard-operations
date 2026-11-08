@@ -20,14 +20,14 @@ Source: `apps/cli-ops` in the NUU monorepo (package `@nuucognition/ops-cli`). Th
 
 - Most commands are `ops <noun> <verb>`. These top-level commands have no noun: `ops login`, `ops whoami`, `ops mode`, `ops ops`, `ops call`, `ops headers`, `ops route`, `ops search`, `ops history`, `ops undo`, and `ops redo`.
 - `--json` and `--org <slug|name|me>` work on every command, anywhere on the line. So no command has its own `--org` or `--version` option: a section of the org is `ops section create <title> --org-wide`, and the version label of a deployment is `--version-label`.
-- With `--json`, stdout holds exactly one JSON document and nothing else. Most lists print a JSON array, and an empty one prints `[]`: `org list`, `member list`, `project list`, `deliverable list`, `section list` (no scope, `--deliverable`, `--deployment`), `task list`, `deadline list`, `plan list`, `day-label list`, `deployment list`, `favourite list`, `notepad list`, `notify prefs list`. Some print an object; read the named field: `section list --project` → `project`, `deliverables[].sections`, `deployments[].sections`; `headers` → `projects`, `deliverables`, `sections`, `deployments` (each with `address`), and `owner` (the org text of each address); `route` → `orgSlug`, `op` (`route.suggest` or `route.candidates`: the op that answered), `model` (`jev` or `text`), `latencyMs`, `intent`, and `candidates[]` (`place {kind, id, title, path}`, `score`, `confidence` when the model gave one, `reason`, `address`); `search` → `items[]` (`kind`, `id`, `title`, `path`, `address`, `status`), `truncated`; `task search` → `results` (with `truncated`); `task subtask list` → `task` (the tree), `total`, `done`; `task map` → `task`, `root`, `subtree`, `home`, `groups`, `lineage`, `related`, `url`; `deployment inbox` → `section`, `tasks`; `deployment show` → `deployment`, `inbox`, `inboxTasks`, `shipsHere`, `startedHere`; `backlog show` → `section` and `tasks` (before the revamp: `folders[].tasks`); `comment list` → `items` (with `hasMore`); `notify list` and `activity list` → `page` (with `isDone`, `continueCursor`); `history` and `plan history` → `undo` and `redo`; `ops ops` → `ops`; `notepad show` → `{notepad, blocks, tasks, markdown}`; `day show` → `items` (with `date`, `doneCount`).
+- With `--json`, stdout holds exactly one JSON document and nothing else. Most lists print a JSON array, and an empty one prints `[]`: `org list`, `member list`, `project list`, `deliverable list`, `section list` (no scope, `--deliverable`, `--deployment`), `task list`, `deadline list`, `plan list`, `deployment list`, `favourite list`, `notepad list`, `notify prefs list`. Some print an object; read the named field: `section list --project` → `project`, `deliverables[].sections`, `deployments[].sections`; `headers` → `projects`, `deliverables`, `sections`, `deployments` (each with `address`), and `owner` (the org text of each address); `route` → `orgSlug`, `op` (`route.suggest` or `route.candidates`: the op that answered), `model` (`jev` or `text`), `latencyMs`, `intent`, and `candidates[]` (`place {kind, id, title, path}`, `score`, `confidence` when the model gave one, `reason`, `address`); `search` → `items[]` (`kind`, `id`, `title`, `path`, `address`, `status`), `truncated`; `task search` → `results` (with `truncated`); `task subtask list` → `task` (the tree), `total`, `done`; `task map` → `task`, `root`, `subtree`, `home`, `groups`, `lineage`, `related`, `url`; `deployment inbox` → `section`, `tasks`; `deployment show` → `deployment`, `inbox`, `inboxTasks`, `shipsHere`, `startedHere`; `backlog show` → `section` and `tasks` (before the revamp: `folders[].tasks`); `comment list` → `items` (with `hasMore`); `notify list` and `activity list` → `page` (with `isDone`, `continueCursor`); `history` and `plan history` → `undo` and `redo`; `ops ops` → `ops`; `notepad show` → `{notepad, blocks, tasks, markdown}`; `day show` → `items` (with `date`, `doneCount`).
 - A write gives the new id and its `address`; a create of a task also gives `place` (`kind`, `id`, `title`, `path`, `address`) and `sectionId`; a create with `--route` also gives `routed` (`model`, `score`, `reason`, `candidates`); a move gives `to`, `moved[]`, and `movedIds` (the tasks and their subtrees). When the read of an address after a write fails, the result keeps the new id with `address: null` (exit 0), and stderr names the read to run again: do not run the write again.
 - Text output is short and stable, and always shows IDs and addresses. A list prints one line per record (`<kind> <id>  <title>  ...  <address>`; a task line starts with its checkbox), or one line `no <things>` when it is empty. A write prints `<past verb> <kind> <id>  <title>`, then its address and its place.
 - Errors go to stderr as `error <code>: <message>`, then indented candidates and hints. A hint names the next step. The exit code is not zero.
 - With `--json`, an error is exactly one JSON document on stderr, and stdout is empty: `{"error": {"code", "message", "exitCode", "status"?, "data"?, "candidates"?, "hints"}}`.
 - A usage error ends with ``Run `ops <noun> <verb> --help` ``. An extra argument is a usage error: quote a text argument that has spaces. A command group with no verb (`ops task`, `ops step requires`, or `ops` alone) is a usage error (exit 2) that lists the verbs; it prints no help text, and with `--json` it is one JSON error document.
 - With `DEBUG=1`, the stack trace follows the error lines; with `--json`, it is the `stack` field of the JSON error document.
-- An op that the deployment does not have yet fails with `agent_unknown_operation`, and the message says that the op is not deployed there yet. Where a former op can do the work, the command uses it (a section of a deliverable, a move to a section or a backlog, a create in a section with the former args).
+- An op that the deployment does not have yet fails with `agent_unknown_operation`, and the message says that the op is not deployed there yet. The CLI (since 0.1.0-dev.3) has no fallback to the former ops of before the revamp (a move through `tasks.place`, a close through `tasks.update`, the section writes of `subsections.*`, the old project snapshot): it needs a deployment with the current ops. The one fallback that stays is the read of the headers: on a deployment with no `headers.forOrg`, a read goes on without the addresses and the paths of the headers, and a verb that needs the headers fails.
 
 ## A first session for an agent
 
@@ -211,8 +211,9 @@ more than one record matches, the command fails with `error <kind>_ambiguous`
 (exit 2) and lists each candidate with its ID and its path. Pass the ID or
 a longer path. Never guess between candidates.
 
-A step title needs `--plan`. A deployment name needs `--project` only on a
-deployment of Ops of before the revamp (the headers name every deployment).
+A plan step title needs `--plan`, and a stream step title needs `--stream`.
+A deployment name needs `--project` only on a deployment of Ops with no
+`headers.forOrg` (the headers name every deployment).
 An ID, URL, or address never needs a scope.
 
 ### Places (`--to` of `task move`)
@@ -264,9 +265,13 @@ subtasks), `subtask_cycle`, `section_named_locked` (the named section of a
 project, a deliverable, or a deployment).
 
 An op that a deployment of Ops does not have yet fails with
-`agent_unknown_operation` and names the deploy. Where a former op can do the
-work (a section of a deliverable, a move to a section or a backlog), the
-command uses it on such a deployment.
+`agent_unknown_operation` and names the deploy. The CLI needs a deployment
+with the current ops: since 0.1.0-dev.3 it has no fallback to the former ops
+of before the revamp (a move through `tasks.place`, a close through
+`tasks.update`, the section writes of `subsections.*`, the old project
+snapshot). The one fallback that stays is the read of the headers
+(`headers.forOrg`): without it, a read goes on with no addresses and paths
+from the headers, and a verb that needs the headers fails.
 
 The guards exit 2: `confirm_required` (a delete that removes other records
 or cannot be undone needs `--yes`: project, deliverable, section, deployment, plan),
@@ -313,7 +318,7 @@ reads stdin.
 | Command | Example |
 |---|---|
 | `ops project list [--status active\|paused\|archived\|all]` — each with its address | `ops project list --status active` |
-| `ops project show <project>` — its sections (the backlog first), its deliverables and deployments with their sections, and the root tasks, each with its address; a deployment of before the revamp gives the former snapshot (deliverables, sections, the backlog folders) | `ops project show Alpha` |
+| `ops project show <project>` — its sections (the backlog first), its deliverables and deployments with their sections, and the root tasks, each with its address | `ops project show Alpha` |
 | `ops project create <name> [--description] [--kind project\|operation] [--start] [--end] [--next-update] [--context <md>]` | `ops project create "Alpha" --next-update +7d` |
 | `ops project update <project> [--name] [--description] [--next-update <date\|none>] [--status] [--kind] [--start <date\|none>] [--end <date\|none>]` | `ops project update Alpha --status paused` |
 | `ops project context show <project>` / `ops project context set <project> (<md\|-> \| --file <path> \| --clear)` — `projects.setContext` | `ops project context set Alpha --file context.md` |
@@ -481,7 +486,7 @@ open). The attachments of a group show on each of its tasks.
 
 | Command | Example |
 |---|---|
-| `ops backlog show [--project <p>] [--all]` — the backlog section of the project (or of the org) by priority band, each task with its address; on a deployment of before the revamp, the former view by folder and band | `ops backlog show --project Alpha` |
+| `ops backlog show [--project <p>] [--all]` — the backlog section of the project (or of the org) by priority band, each task with its address | `ops backlog show --project Alpha` |
 
 `ops folder list|create|rename|reorder|delete` (the backlog folders of
 before the revamp) stays hidden for old callers. The migration of the revamp
@@ -764,7 +769,7 @@ Scopes are `org:<slug>`, `project:<id>`, `deliverable:<id>`,
 `subsection:<id>`, `backlog:<projectId>`, `backlog:org:<slug>`, and
 `plan:<id>`. `org:me` and `backlog:org:me` name the personal workspace.
 `--on` maps a record to its scope (a task to its section or backlog, a
-step to its plan, a deadline, day label, or deployment to `org:<slug>`).
+step to its plan, a deadline or a deployment to `org:<slug>`).
 
 ### history, undo, redo (any scope)
 
@@ -792,14 +797,11 @@ than 100 favourites in one org gives `favourites_full`. The ops come from
 (Task) 316: on a deployment without them, the error says that they are not
 deployed yet.
 
-### day-label
+### day-label (gone)
 
-| Command | Example |
-|---|---|
-| `ops day-label list` | `ops day-label list` |
-| `ops day-label create <label> --start <date> [--end <date>] [--color water\|fire\|earth\|air\|sun\|moon\|muted]` | `ops day-label create Offsite --start 2026-10-12 --end 2026-10-14 --color sun` |
-| `ops day-label update <day-label> [--label] [--start] [--end] [--color]` | `ops day-label update Offsite --color moon` |
-| `ops day-label delete <day-label>` | `ops day-label delete Offsite` |
+`ops day-label` is gone (Task 390): a day label is an all-day event of a
+calendar now. Use `ops event create <label> --date <first day> [--until <last day>]`
+(see [event](#event)).
 
 ### notepad
 
@@ -950,8 +952,9 @@ optional check schedule. A live deployment has an inbox section.
 The program owns `--version` (it prints the version of the CLI anywhere on
 the line), so the label is `--version-label`. The version chain of before the
 revamp is deprecated: `--previous`, `--url`, `--identifier`, `--not-owned`,
-`list --chains`, `end-chain`, and `reopen-chain` stay hidden, print a note,
-and work while the service keeps them.
+and `list --chains` stay hidden, print a note, and work while the service
+keeps them. The hidden `end-chain`, `reopen-chain`, and `section deployment`
+are gone (0.1.0-dev.3).
 
 ### query
 
@@ -1037,7 +1040,7 @@ release session); before that, each one fails on prod with
 
 | Command | What it does, and its traps |
 |---|---|
-| `ops address <record> [--kind project\|deliverable\|section\|task\|deployment\|taskgroup\|notepad\|plan\|step\|deadline\|blocker]` | The address of any record: the display address (the alias, else the id form), the id address, the `nuu://ops/<type>/<id>` URI, and `canRename`. A project, a deliverable, a task, a task group, and a notepad have an address row. A section, a deployment, and a blocker have the id form only (`@v1/<org>/section/<id>#ops`, `@v1/<org>/blocker/<id>#ops`; a blocker reads it from `blockers.get`). A plan, a step, a deadline, and a day label have no address: use the ID. A title needs `--kind`. `moved: true` means that the text is an old alias or an old form: use the printed address. |
+| `ops address <record> [--kind project\|deliverable\|section\|task\|deployment\|taskgroup\|notepad\|plan\|step\|deadline\|blocker]` | The address of any record: the display address (the alias, else the id form), the id address, the `nuu://ops/<type>/<id>` URI, and `canRename`. A project, a deliverable, a task, a task group, and a notepad have an address row. A section, a deployment, and a blocker have the id form only (`@v1/<org>/section/<id>#ops`, `@v1/<org>/blocker/<id>#ops`; a blocker reads it from `blockers.get`). A plan, a step, and a deadline have no address: use the ID. A title needs `--kind`. `moved: true` means that the text is an old alias or an old form: use the printed address. |
 | `ops address rename <record> [name] [--clear]` | `addresses.rename`: set the alias of the address of a project, a deliverable, a task, a notepad, or a task group, or remove it. It needs owner rights. A deliverable is renamed inside its project, and its name cannot be removed (`name-required`). Other refusals: `name-taken` (with a suggestion), `name-invalid`, `name-like-id`, `name-reserved`. |
 | `ops people search <text> [--limit 1-50]`, `ops people show <@handle\|email\|user_id>` | The profiles in the scope of the active org. `people show` takes a `@handle`, an email, or a Clerk `user_` id; not `me`, and not the users-table id of `ops whoami`. `ops member list` gives the user rows that task owners and assignees use. |
 | `ops project link <project> <uri...>` | Links NUU Connect URIs (`nuu://<app>/<type>/<id>`) to a project. Each URI is stored one time; at most 50. A bad URI gives `connect_bad_request` (exit 1). `--json` gives `{id, connectRefs}`. |
