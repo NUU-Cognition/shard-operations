@@ -101,7 +101,7 @@ ndv names the link `ops` in both profiles. The name `ops-dev` is only a package 
 1. Run `ops mode`. Read the line `build mode` (`prod` or `dev`) and the line `data mode`. Write only when the data mode is the data of the request.
 2. Run `ops --help`. It must list `headers`, `route`, `search`, and `section`. When it does not, the build is of before the revamp: rebuild it (`ndv build ops` or `ndv build ops prod`), or use the dev launcher below.
 
-For DEV data, run the dev launcher of the monorepo checkout. It is always a dev build, and `OPS_DATA_MODE=dev` holds for it:
+For DEV data, run the dev launcher of the monorepo checkout with `OPS_DATA_MODE=dev`. It is always a dev build, so the variable holds for it. Without the variable, the dev launcher uses PROD data:
 
 ```bash
 OPS_DATA_MODE=dev node "<monorepo>/apps/cli-ops/bin/ops.js" mode          # build mode dev; data mode dev (env)
@@ -117,10 +117,10 @@ The mode selects the Convex deployment and the credential together.
 | Build on PATH as `ops` | Data | Deployment | Credential |
 |------------------------|------|------------|------------|
 | Prod build (`ndv use ops prod`) | always prod | `acoustic-weasel-248` | `auth.json` |
-| Dev build (`ndv use ops dev`) | dev (default) | `next-dalmatian-912` | `auth.local.json` |
-| Dev build after `ops mode prod` | prod | `acoustic-weasel-248` | `auth.json` |
+| Dev build (`ndv use ops dev`), no choice | **prod (default since Task 415)** | `acoustic-weasel-248` | `auth.json` |
+| Dev build with `OPS_DATA_MODE=dev` | dev | `next-dalmatian-912` | `auth.local.json` |
 
-The dev build uses dev data by default. `ops mode prod` moves the dev build to prod data, as Strike does, and `ops mode dev` moves it back. The choice is stored in `~/.nuucognition/ops-dev-data.json`. `OPS_DATA_MODE=dev|prod` overrides it for one run, on a dev build only: a prod build ignores it. Before a write, run `ops mode` and know which data the CLI points at. A test write on prod data is a real write that people see.
+**A dev build uses PROD data by default** (Task 415), with the sign-in of `nuu login`, and prints one stderr note: `note: this dev build uses PROD data …: each write is real. For dev data: OPS_DATA_MODE=dev.` A dev build takes the first choice that it finds: `OPS_DATA_MODE`, a test run (dev data), `NUU_DATA_MODE`, the shared file `~/.nuucognition/dev-data.json` (`ops mode dev|prod` and `flint env use` write it), then prod. A prod build ignores all of them. The old file `~/.nuucognition/ops-dev-data.json` is not read any more. For dev data, set `OPS_DATA_MODE=dev` on each command. Before a write, run `ops mode` and read the line `data mode` and its source. A test write on prod data is a real write that people see.
 
 ## Organisations
 

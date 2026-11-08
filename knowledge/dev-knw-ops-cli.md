@@ -121,28 +121,43 @@ together:
 |---|---|---|
 | Says | which code runs | which deployment and which credential |
 | Prod build (`bin/ops-prod.js`, `dist/`) | prod | always prod |
-| Dev build (`bin/ops.js`, `dist-dev/`, source) | dev | dev by default |
+| Dev build (`bin/ops.js`, `dist-dev/`, source) | dev | **prod by default** (Task 415); `OPS_DATA_MODE=dev` for dev data |
 
 | Data mode | Gateway site | Credential | Web links |
 |---|---|---|---|
 | dev | `https://next-dalmatian-912.convex.site` | `~/.nuucognition/auth.local.json` | `http://localhost:3088` |
 | prod | `https://acoustic-weasel-248.convex.site` | `~/.nuucognition/auth.json` | `https://ops.nuucognition.com` |
 
-A dev build reads its data mode in this order:
+A dev build reads its data mode in this order (Task 415). The first
+choice that it finds wins:
 
-1. `OPS_DATA_MODE=dev|prod` (one run; a prod build ignores it).
-2. `~/.nuucognition/ops-dev-data.json` (set with `ops mode dev|prod`).
-3. `dev`.
+1. `OPS_DATA_MODE=dev|prod` (ops only; one run; a prod build ignores it).
+2. A test run (`node --test`, Vitest): dev data, so that a test suite never
+   touches prod data.
+3. `NUU_DATA_MODE=dev|prod` (shared by the dev builds of cli-core).
+4. `~/.nuucognition/dev-data.json` (shared: `ops mode dev|prod` and
+   `flint env use` write it).
+5. `prod`. With no choice, a dev build uses prod data and the sign-in of
+   `nuu login`, as `nuu` does.
 
-A test run (`node --test`) stays on dev data unless `OPS_DATA_MODE` says
-otherwise. A prod build reads neither the variable nor the file.
+**A dev build uses PROD data by default.** On prod data it prints one note
+on stderr: `note: this dev build uses PROD data (<source>), with the sign-in
+of nuu login: each write is real. For dev data: OPS_DATA_MODE=dev.` For any
+test or any work on dev data, set `OPS_DATA_MODE=dev` on each command. The
+file of before Task 415, `~/.nuucognition/ops-dev-data.json`, is not read
+any more: `ops mode` prints a note while it is on disk. A prod build reads
+no variable and no file.
 
 ```bash
-ops mode                 # build mode, data mode, site, credential file
-ops mode prod            # dev build only: use prod data from now on
-ops mode dev             # dev build only: back to dev data
-OPS_DATA_MODE=prod node apps/cli-ops/bin/ops.js whoami   # the dev launcher, prod data, this run only
+ops mode                 # build mode, data mode and its source, site, credential file
+ops mode dev             # dev build only: write dev into the shared file (flint env use writes it too)
+ops mode prod            # dev build only: write prod into the shared file
+OPS_DATA_MODE=dev node apps/cli-ops/bin/ops.js whoami    # the dev launcher, dev data, this run only
 ```
+
+The line `data mode` of `ops mode` names the source: `dev  (env OPS_DATA_MODE)`,
+`prod  (default)`, `dev  (file)`, or `dev  (test)`. `ops mode prod` on a prod
+build refuses with `mode_fixed` (exit 2).
 
 ## Auth
 
@@ -151,7 +166,8 @@ OPS_DATA_MODE=prod node apps/cli-ops/bin/ops.js whoami   # the dev launcher, pro
 ran `nuu login` (prod) or a dev nuu login (dev) needs no other step.
 `nuu login`, `flint login`, and `ops login` write the same prod credential,
 `~/.nuucognition/auth.json`: a machine that is signed in to flint needs no
-other step. The dev build reads `~/.nuucognition/auth.local.json`. An agent
+other step. A dev build on dev data reads `~/.nuucognition/auth.local.json`; a dev
+build on prod data reads `auth.json` (the sign-in of `nuu login`). An agent
 cannot sign in: on `auth_required` (exit 3), ask the operator to run
 `nuu login`. The
 token refreshes through the account service of that mode (dev:
@@ -311,6 +327,7 @@ reads stdin.
 | `ops deliverable update <deliverable> [--title] [--deployment <d\|none>] [--from-deployment <d\|none>]` — `deliverables.setDeployment` | `ops deliverable update "v1.1" --deployment Production` |
 | `ops deliverable done <deliverable>` / `ops deliverable reopen <deliverable>` — `deliverables.setDone`: a person decides; the sections do not | `ops deliverable done "Alpha › v1 launch"` |
 | `ops deliverable rename <deliverable> <title>` | `ops deliverable rename "v1 launch" "v1.0 launch"` |
+| `ops deliverable move <deliverable> --to <project> [--project <p>]` — `deliverables.move`: move a deliverable with its sections and tasks to another project (its name moves too); `--project` narrows a title search | `ops deliverable move "Alpha › v1 launch" --to Beta` |
 | `ops deliverable context show\|set <deliverable> …` — `deliverables.setContext` | `ops deliverable context set "v1 launch" "The first public release"` |
 | `ops deliverable delete <deliverable> --yes` — deletes its sections and tasks; refuses without `--yes` | `ops deliverable delete "v1.0 launch" --yes` |
 | `ops deliverable flint set <deliverable> <address> [--flint-id <uuid\|none>] [--project]` — the one Flint place (`deliverables.setFlintPlace`); `deliverable show` prints it | `ops deliverable flint set "v1 launch" @v1//flint/nuu-operations` |
@@ -329,7 +346,6 @@ reads stdin.
 | `ops section move <section> --to <project:<p>\|deliverable:<d>\|deployment:<d>\|org>` — `sections.moveHome`; the tasks go with it; a section with a role does not move | `ops section move Ideas --to deliverable:"Alpha › v2"` |
 | `ops section reorder <section> (--before <s>\|--after <s>\|--top\|--bottom)` — inside its home (`sections.reorder` takes every section of the home) | `ops section reorder Backend --top` |
 | `ops section deps set\|add\|remove <section> [deps...]` — the sections it comes after | `ops section deps set QA Backend Frontend` |
-| `ops section priority <section> on\|off` | `ops section priority Backend on` |
 | `ops section archive\|unarchive <sections...>` — `sections.archive` | `ops section archive Backend` |
 | `ops section context show\|set <section> …` — `sections.update` | `ops section context set Backend "The API and the queue"` |
 | `ops section delete <section> --yes` — deletes its tasks; refuses without `--yes` | `ops section delete Backend --yes` |
@@ -361,6 +377,7 @@ reads stdin.
 | `ops task review cancel <task> [--to <member>]` — `reviews.cancel`: withdraw the open request that you made; when you asked more than one reviewer, `--to` names the reviewer (else `review_ambiguous`, exit 2, with the reviewers as candidates); `--json`: `{itemId, id, orgSlug, reviewerUserId, cancelled: true}` | `ops task review cancel <task>` |
 | `ops task loop add <task> <person>` — `taskLoops.add`: loop a member of the org into the task; the person follows the task beside its owner, hears every comment on it, and gets a notification; `<person>` takes `me` or a member as `--assign` does; a person in the loop already gives `no change`; a task loops in at most 50 people (`loop_full`); a review request loops in the reviewer, and a mention in a comment loops in the mentioned member; `--json`: `{id, orgSlug, userId, added}` | `ops task loop add <task> @ana` |
 | `ops task loop remove <task> <person>` — `taskLoops.remove`: take a person out of the loop of the task; a person who is not in it gives `no change`; `--json`: `{id, orgSlug, userId, removed}` | `ops task loop remove <task> @ana` |
+| `ops task holds <task>` — `holds.ofTask`: the hold of a task (a short lease of an actor on the task), or none | `ops task holds <taskId> --json` |
 
 #### Subtasks and the task map
 
@@ -370,7 +387,8 @@ reads stdin.
 | `ops task subtask list <task>` — the subtree with the done count (`subtasks.tree`; cut at 200 tasks) | `ops task subtask list <taskId>` |
 | `ops task subtask move <task> (--under <parent> \| --root) [--index n]` — `subtasks.reparent`; `--root`: a root task in the home of its old root | `ops task subtask move <taskId> --under <parentId>` |
 | `ops task subtask reorder <task> --index n` — its place among its siblings (0 is first) | `ops task subtask reorder <taskId> --index 0` |
-| `ops task subtask indent\|outdent <task>` — under the sibling above it, or one level up | `ops task subtask outdent <taskId>` |
+| `ops task subtask outdent <task>` — make a subtask a root task again, after its parent | `ops task subtask outdent <taskId>` |
+| `ops task subtask children <task>` — `subtasks.children`: the subtasks as full task rows | `ops task subtask children <taskId> --json` |
 | `ops task map <task>` — `taskMap.get`: the root and the subtree, the home (project, deliverable, deployment, section), the task groups with their members, the lineage (split, merged, continues, after, before), the related links, each with its address, and the web page of the map | `ops task map <taskId> --json` |
 
 A task order bucket is one section **and** one priority band (before the
@@ -447,6 +465,8 @@ open). The attachments of a group show on each of its tasks.
 | `ops comment delete <task> <commentId>` | `ops comment delete "Write docs" <commentId>` |
 | `ops comment react <task> <commentId> <emoji>` | `ops comment react "Write docs" <commentId> 👍` |
 | `ops comment unreact <task> <commentId> <emoji>` | `ops comment unreact "Write docs" <commentId> 👍` |
+| `ops comment count <tasks...>` — `updates.count`: the comment counts of many tasks | `ops comment count <a> <b>` |
+| `ops comment people` — `updates.people`: the people that you can mention in a comment | `ops comment people --json` |
 
 ### backlog
 
@@ -610,7 +630,7 @@ for any other scope (below).
 
 ### step
 
-Steps take an ID or URL alone, or a title or short ID with `--plan`.
+Steps take an ID or URL alone, or a title or short ID with `--plan <plan>` (a plan step) or `--stream <stream>` (a stream step of Trident). Each `ops step` verb takes a stream step too: `update`, `assign`, `requires`, `links`, and `delete` act on the steps of a lane as on the steps of a plan.
 
 | Command | Example |
 |---|---|
@@ -626,6 +646,13 @@ Steps take an ID or URL alone, or a title or short ID with `--plan`.
 | `ops step move <step> (--x <x> --y <y> \| --dx <dx> --dy <dy>) [--with-downstream] [--plan]` | `ops step move Build --dx 120 --with-downstream --plan Launch` |
 | `ops step move start\|end --plan <plan> (--x --y \| --dx --dy)` — the sentinels | `ops step move end --plan Launch --x 1400 --y 0` |
 | `ops step delete <step> [--plan]` — soft; `plan undo` revives it | `ops step delete Deploy --plan Launch` |
+| `ops step split <step> [--before] [--title <t>] [--start] [--shore] [--assign <member>]` — `plans.splitNode`: a new step after the step (`--before`: before it); `--start` makes it active; `--shore` puts it on the shore (a planned stream step only, else `node_shore_invalid`) | `ops step split <stepId> --title "Review"` |
+| `ops step split-beside <step> [--title <t>] [--assign <member>]` — `plans.splitBeside`: a new step beside the step, with the same `requires`, cross links, substream, and state; a done step refuses (`node_gated`) | `ops step split-beside <stepId> --title "Docs"` |
+| `ops step state <planned\|active\|done> <steps...> [--shore\|--no-shore]` — `plans.setStepState` | `ops step state active <a> <b>` |
+| `ops step done-next <step> [--title <t>] [--assign <member>]` — `plans.doneAndNext`: the step is done, and a new active step comes after it; a step that is not active refuses (`node_not_doing`) | `ops step done-next <stepId> --title "Deploy"` |
+| `ops step move-links --link <from>:<to>... --end from\|to --target <step>` — `plans.moveLinks`: move one end of each edge to another step | `ops step move-links --link <a>:<b> --end to --target <c>` |
+| `ops step remove-links <from>:<to>...` — `plans.removeLinks` | `ops step remove-links <a>:<b>` |
+| `ops step place <step> --x <x> --y <y>` — `plans.setBoardPositions`: the place on the Trident lane, in board units | `ops step place <stepId> --x 320 --y 80` |
 
 **The drag rule.** `--with-downstream` matches the web canvas
 (`onNodeDragStop` in `src/components/plans/plan-view.tsx`): the step lands
@@ -634,6 +661,74 @@ included) moves by the same offset, in **one** `plans.setPositions` call. A
 zero-length move writes nothing. A downstream step with no stored position
 stays where it is and is reported as `kept` (the UI moves it from a
 fallback layout that the CLI does not compute).
+
+### stream (Trident)
+
+Trident is the stream view of Ops (ops-overnight-1109). A **stream** is a
+lane of work: a titled lane with a state (`active`, `paused`, `done`), the
+places that it serves (its attachments), and its **steps**. A stream step
+is a plan step of the lane: the `ops step` verbs take it too (below). Each
+step is in one **zone**: `planned` (above the now line), `active` (on the
+now line), or `done` (under it). The **shore** is a part of the planned zone:
+the goals of the lane, above the planned steps (only a `todo` step goes
+there). A **parked** step is off the board (in the Parked menu) until you
+unpark it; it keeps its place, its state, and its links. A **substream** is a
+named group of steps inside a lane, with a box on the board. A **cross link**
+joins a step to a step of another stream; it gates nothing. A **drawing** is
+a line, a free line, or a text on the board of the lane. A Trident
+**workspace** is a named set of streams of one person. The model, the rules,
+the limits, and the error codes are in [[dev-knw-ops-data_model]] § Trident.
+
+A `<stream>` is an ID or a title. A `<step>` of a stream is an ID; a title or
+a short ID needs `--stream <stream>`. A `<substream>` is an ID; a title needs
+`--stream <stream>`. A place of `attach` is `project:<ref>`,
+`deliverable:<ref>`, `section:<ref>`, an ID, or a web URL.
+
+| Command | Example |
+|---|---|
+| `ops stream list [--state active\|paused\|done\|all]` — the streams of the org | `ops stream list --state all` |
+| `ops stream show <stream>` — the lane: the attachments, the substreams, the steps by zone (shore, planned, active, done), the parked steps, the `requires` edges, the cross links, and the linked records | `ops stream show "Launch lane" --json` |
+| `ops stream create <title> [--description <text>]` | `ops stream create "Launch lane"` |
+| `ops stream update <stream> [--title <t>] [--description <text>] [--state active\|paused\|done]` | `ops stream update "Launch lane" --state paused` |
+| `ops stream delete <stream>` — a soft delete (`streams.remove`); `ops stream undo` brings the lane back with its steps. A stream has no archive state | `ops stream delete "Old lane"` |
+| `ops stream attach <stream> <places...>` — the places that the lane serves | `ops stream attach "Launch lane" project:Alpha deliverable:"Alpha › v1"` |
+| `ops stream detach <stream> [places...] [--all]` | `ops stream detach "Launch lane" --all` |
+| `ops stream size <stream> [--width <n\|default>] [--shore-height <n\|default>]` — the size of the lane on the board | `ops stream size "Launch lane" --width default` |
+| `ops stream history <stream>` — the undo and redo stacks of the lane | `ops stream history "Launch lane" --json` |
+| `ops stream undo\|redo <stream> [--expect <seq>] [--dry-run]` — read `history` first; the rules of `ops undo` hold | `ops stream undo "Launch lane" --expect 12` |
+| `ops stream step add <stream> <title> [--after <step>]... [--state planned\|active\|done] [--shore] [--description <text>] [--assign <member>]` | `ops stream step add "Launch lane" "Write the copy" --shore` |
+| `ops stream step add-task <stream> <task> [--state planned\|active\|done] [--shore]` — a step that is an existing task | `ops stream step add-task "Launch lane" <taskId>` |
+| `ops stream step create-task <step> --to section:<ref>\|project:<ref> [--stream <stream>]` — make a task for a step (`project:` is its backlog) | `ops stream step create-task <stepId> --to project:Alpha` |
+| `ops stream step move <steps...> --to <stream> [--stream <stream>]` — to another lane | `ops stream step move <a> <b> --to "Next lane"` |
+| `ops stream step park\|unpark <steps...> [--stream <stream>]` | `ops stream step park <stepId>` |
+| `ops stream step shore\|unshore <steps...> [--stream <stream>]` | `ops stream step unshore <stepId>` |
+| `ops stream step cross set\|add\|remove <step> [steps...] [--stream <stream>]` — the cross links to steps of other streams; they gate nothing | `ops stream step cross add <a> <b>` |
+| `ops stream step substream <steps...> --to <substream\|none> [--stream <stream>]` — put steps in a substream, or take them out | `ops stream step substream <a> <b> --to <substreamId>` |
+| `ops stream substream create <stream> <title> [--step <step>]... [--box <x,y,width,height>]` | `ops stream substream create "Launch lane" "Copy" --step <a>` |
+| `ops stream substream rename <substream> <title> [--stream <stream>]` | `ops stream substream rename <substreamId> "Copy and art"` |
+| `ops stream substream park\|unpark <substream> [--stream <stream>]` | `ops stream substream park <substreamId>` |
+| `ops stream substream place <substream> --box <x,y,width,height> [--stream <stream>]` | `ops stream substream place <substreamId> --box 0,0,640,320` |
+| `ops stream substream ungroup <substream> [--stream <stream>]` — the steps stay in the lane | `ops stream substream ungroup <substreamId>` |
+| `ops stream drawing list <stream>` | `ops stream drawing list "Launch lane"` |
+| `ops stream drawing add <stream> --kind line\|free\|text --points <x1,y1,...> [--text <words>]` | `ops stream drawing add "Launch lane" --kind text --points 40,40 --text "Ship gate"` |
+| `ops stream drawing text <stream> <drawing> <text>` — an empty text removes the drawing | `ops stream drawing text "Launch lane" <drawingId> "Gate 2"` |
+| `ops stream drawing move <stream> <drawings...> --dx <n> --dy <n>` | `ops stream drawing move "Launch lane" <drawingId> --dx 20 --dy 0` |
+| `ops stream drawing remove <stream> <drawings...>` | `ops stream drawing remove "Launch lane" <drawingId>` |
+
+### workspace (Trident)
+
+A Trident **workspace** is a named set of streams of the caller: the lanes
+that one person shows together. It is personal.
+
+| Command | Example |
+|---|---|
+| `ops workspace list` | `ops workspace list --json` |
+| `ops workspace show <workspace>` | `ops workspace show "Launch week"` |
+| `ops workspace create [title] [--stream <stream>]...` | `ops workspace create "Launch week" --stream "Launch lane"` |
+| `ops workspace update <workspace> --title <t>` | `ops workspace update "Launch week" --title "Launch"` |
+| `ops workspace streams set\|add\|remove <workspace> [streams...]` | `ops workspace streams add "Launch" "Next lane"` |
+| `ops workspace reorder <workspaces...>` — the new order of your workspaces | `ops workspace reorder Launch Backlog` |
+| `ops workspace delete <workspace>` — the streams stay; the last workspace cannot be deleted (`workspace_last`) | `ops workspace delete "Launch"` |
 
 ### notify
 
@@ -645,6 +740,8 @@ fallback layout that the CLI does not compute).
 | `ops notify unread <ids...>` | `ops notify unread <notificationId>` |
 | `ops notify read-all [--this-org]` | `ops notify read-all` |
 | `ops notify dismiss <id>` | `ops notify dismiss <notificationId>` |
+| `ops notify read-prefix <prefix>` — `notifications.markReadByKeyPrefix`: mark as read each notification whose collapse key starts with the prefix | `ops notify read-prefix task:<taskId>` |
+| `ops notify dismiss-all [--this-org]` — `notifications.dismissAll`: remove each notification from the list (ask the operator first) | `ops notify dismiss-all --this-org` |
 | `ops notify prefs list` | `ops notify prefs list` |
 | `ops notify prefs set <category> on\|off [--channel <c>]` — categories: tasks, deadlines, plans, updates | `ops notify prefs set plans off --channel push` |
 
@@ -715,6 +812,10 @@ text: only the ID counts.
 | `ops notepad to-task <notepad> <text> [--section <s> \| --project <p> \| --backlog] [--title <t>] [--keep]` — make a task from a text; a task chip replaces the text (`--keep`: the chip follows it); with no destination flag, the task goes to the section of the notepad; a notepad with no scope needs a flag | `ops notepad to-task <notepadId> "Call Sam about the beta" --backlog` |
 | `ops notepad move-to-task <notepad> <task> <text> [--copy]` — move a text to the end of a task description (`--copy`: leave it in the notepad) | `ops notepad move-to-task <notepadId> <taskId> "The budget is 4k."` |
 | `ops notepad delete <notepad>` — a soft delete: the notepad leaves every list and read | `ops notepad delete <notepadId>` |
+| `ops notepad block add\|edit\|remove\|move …` — `notepads.addBlock`, `updateBlock`, `removeBlock`, `moveBlock`: one text block of the notepad (see `ops notepad block --help`) | `ops notepad block add <notepadId> "- A new line"` |
+| `ops notepad section <notepad> <section\|none>` — `notepads.setSection`: the section that the notepad links | `ops notepad section <notepadId> none` |
+| `ops notepad make-task <notepad> <text> [--title <t>]` — make a task from a text of the notepad; a task chip replaces the text | `ops notepad make-task <notepadId> "Call Sam"` |
+| `ops notepad undo-make-task <notepad> <task> --expect <state>` — take back one `make-task` | `ops notepad undo-make-task <notepadId> <taskId> --expect <state>` |
 
 Traps:
 
@@ -753,6 +854,53 @@ Traps:
   ID, or a title). `add` finds the task in an org.
 - To check a task off, use `ops task done <task>`. The day plan has no
   done mark of its own.
+
+### share
+
+A share gives another org or one person access to one record of your org
+(`shares.*`). The permission is `reader` (the default) or `editor`. A
+`<record>` is `task:<ref>`, `project:<ref>`, `deliverable:<ref>`, an ID, an
+address, or a web URL. A `<shareId>` is the ID of one access line (from
+`ops share list --json`).
+
+| Command | Example |
+|---|---|
+| `ops share list <record>` — `shares.forEntity`: the access lines of the record | `ops share list project:Alpha --json` |
+| `ops share access <record>` — `shares.viewerAccess`: how you reach the record | `ops share access task:<taskId>` |
+| `ops share add <record> --to org:<slug>\|person:<member> [--permission reader\|editor]` — `shares.share` | `ops share add project:Alpha --to person:@ana --permission editor` |
+| `ops share permission <shareId> <reader\|editor>` — `shares.setPermission` | `ops share permission <shareId> reader` |
+| `ops share remove <shareId>` — `shares.unshare` | `ops share remove <shareId>` |
+| `ops share with` — `shares.sharedWith`: the records that other orgs shared with the active workspace (`--org` picks the workspace) | `ops share with --org me` |
+
+### calendar
+
+A calendar is a named, coloured set of events of the org. One calendar is
+your default: a new event goes there when you name no calendar.
+
+| Command | Example |
+|---|---|
+| `ops calendar list` | `ops calendar list --json` |
+| `ops calendar show <calendar>` | `ops calendar show Team` |
+| `ops calendar create <name> [--color <c>]` | `ops calendar create Releases --color sun` |
+| `ops calendar update <calendar> [--name <n>] [--color <c>]` | `ops calendar update Releases --name "Release days"` |
+| `ops calendar delete <calendar>` | `ops calendar delete Releases` |
+| `ops calendar default <calendar>` — `calendar.setDefaultCalendar` | `ops calendar default Team` |
+
+### event
+
+An event is a timed or an all-day item of a calendar. A **period** is an
+all-day event of more than one day: `--date <first day> --until <last day>`.
+An event can repeat, and it can attach to a task or a deadline.
+
+| Command | Example |
+|---|---|
+| `ops event list [--from <day>] [--to <day> \| --days <n>] [--calendar <calendar>] [--tz <zone>]` | `ops event list --from today --days 7` |
+| `ops event show <event>` | `ops event show <eventId>` |
+| `ops event create <title> (--start <datetime> --end <datetime> [--tz <zone>] \| --date <day> [--until <day>]) [--calendar <calendar>] [--repeat daily\|weekly\|monthly\|yearly] [--notes <text>] [--place <text>] [--link <url>] [--color <c>] [--person <member>]... [--guest "Name <email>"]... [--attach task:<ref>\|deadline:<ref>]...` | `ops event create "Launch week" --date 2026-11-16 --until 2026-11-20` |
+| `ops event update <event> [the fields of create] [--occurrence <day>] [--scope this\|following\|all]` — for a repeated event, `--occurrence` names one day, and `--scope` says which occurrences change | `ops event update <eventId> --occurrence 2026-11-18 --scope this --start "2026-11-18 10:00" --end "2026-11-18 11:00"` |
+| `ops event delete <event> [--occurrence <day>] [--scope this\|following\|all]` | `ops event delete <eventId> --occurrence 2026-11-18 --scope following` |
+| `ops event attach\|detach <event> task:<ref>\|deadline:<ref>` | `ops event attach <eventId> task:<taskId>` |
+| `ops event for task:<ref>\|deadline:<ref>` — `calendar.eventsForRecord`: the events of a record | `ops event for task:<taskId>` |
 
 ### deployment
 
@@ -865,6 +1013,7 @@ release session); before that, each one fails on prod with
 | Command | What it does, and its traps |
 |---|---|
 | `ops address <record> [--kind project\|deliverable\|section\|task\|deployment\|taskgroup\|notepad\|plan\|step\|deadline\|blocker]` | The address of any record: the display address (the alias, else the id form), the id address, the `nuu://ops/<type>/<id>` URI, and `canRename`. A project, a deliverable, a task, a task group, and a notepad have an address row. A section, a deployment, and a blocker have the id form only (`@v1/<org>/section/<id>#ops`, `@v1/<org>/blocker/<id>#ops`; a blocker reads it from `blockers.get`). A plan, a step, a deadline, and a day label have no address: use the ID. A title needs `--kind`. `moved: true` means that the text is an old alias or an old form: use the printed address. |
+| `ops address rename <record> <name>` / `ops address rename <record> --clear` | `addresses.rename`: set the alias of the address of a record, or remove it (the address goes back to the id form). The old alias still finds the record (`moved: true`). |
 | `ops people search <text> [--limit 1-50]`, `ops people show <@handle\|email\|user_id>` | The profiles in the scope of the active org. `people show` takes a `@handle`, an email, or a Clerk `user_` id; not `me`, and not the users-table id of `ops whoami`. `ops member list` gives the user rows that task owners and assignees use. |
 | `ops project link <project> <uri...>` | Links NUU Connect URIs (`nuu://<app>/<type>/<id>`) to a project. Each URI is stored one time; at most 50. A bad URI gives `connect_bad_request` (exit 1). `--json` gives `{id, connectRefs}`. |
 | `ops project unlink <project> <uri>` | Removes one URI. A URI that is not linked changes nothing. |

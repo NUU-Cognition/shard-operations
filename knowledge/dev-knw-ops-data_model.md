@@ -826,6 +826,116 @@ A subplan link that makes plans contain each other in a loop gives `node_subplan
 
 A step title of "New step" is the default when `insertBefore` or `insertBetween` gets no title. A deadline attaches to a step through the deadline's own `links` (`kind: "plan-node"`).
 
+## Trident: Streams and Workspaces
+
+Trident is the stream board of Ops (module `streams`, and `tridentWorkspaces`). A **stream** is a lane of work. It is not a plan, but it holds the same step rows: each step gesture of `plans.*` serves a plan step and a stream step.
+
+### Streams
+
+Table `streams` (index `by_orgSlug`):
+
+| Field | Meaning |
+|---|---|
+| `title`, `description?` | Trimmed. An empty description is stored as no description. |
+| `state` | `active`, `paused`, or `done`. `create` sets `active`. |
+| `order` | The rank of the lane in the Streams menu. A new stream is last. |
+| `hue` | 1 to 8. Set at the create (the hue that the fewest streams use), and never changed. |
+| `attachments?` | The places that the lane serves: `{kind: "project" \| "deliverable" \| "subsection", id}`, at most 20 (`stream_attachments_limit`). They feed the side panel of the lane with open tasks. They change no record. `projectId?` is a legacy field: it reads as the first attachment, and the first `setAttachments` clears it. |
+| `width?`, `shoreHeight?` | The size of the lane in board units. Width 200 to 2400 (default 360), shore height 112 to 1200 (default 212). `null` resets to the default. A resize is not an undo event. |
+| `drawings?` | Lines, free lines, and texts on the lane: `{id, kind: "line" \| "free" \| "text", points, text?}` (below). |
+| `removedAt?` | A soft delete. |
+
+### Stream Steps
+
+A stream step is a row of `plan_nodes` with `streamId` set and no `planId` (index `plan_nodes.by_stream`). A step has one home: one plan or one stream. It has the fields of a plan step (`requires`, `order`, `done?`, `startedAt?`, `assigneeUserId?`, `links?`, `removedAt?`), and these fields of a stream only:
+
+| Field | Meaning |
+|---|---|
+| `boardPosition?` | `{x, y}` on the lane. `x` is from the left edge of the lane. `y` is from the **now line** up (negative under it). |
+| `shoreAt?` | The step is a goal on the **shore** of its lane, above the planned steps. |
+| `parkedAt?` | The step is off the board, in the Parked menu. It keeps its place, its state, its links, and its substream. |
+| `substreamId?` | The substream of the step. |
+| `crossRequires?` | The steps of **other** streams that this step comes after. |
+
+**Zones.** The state of a step gives its zone on the lane:
+
+| State | Zone | Place |
+|---|---|---|
+| `todo` (planned) | above the now line | `y >= 56` |
+| `doing` (active) | on the now line | `y = 0` |
+| `done` | under the now line | `y <= -56` |
+
+Each place has `x >= 24` and coordinates in ±20000. A place is rounded to whole units and clamped into the zone of the step. The **shore** is a part of the planned zone: only a `todo` step goes on the shore (`node_shore_state`). A start or a done clears `shoreAt`.
+
+**Rules.**
+
+1. **Cross links gate nothing.** A cross link points to a live step of another live stream of the org (`node_cross_invalid`). There is no cycle check. A removed or moved target reads as no link.
+2. **One link for each stream step.** A stream step has at most one record link (`node_link_single`). A step with one task link changes the status of its task when its state changes. A step with one deliverable or section link keeps its own state. Any other linked step refuses a state move (`node_done_linked`). A deliverable or a section that is done from its own work cannot leave Done (`node_record_done`).
+3. **A move to another stream** (`streams.moveSteps`) keeps the links between the moved steps. A link from a moved step to a step that stays becomes a cross link. A cross link to a step of the target stream becomes a lane link (`requires`). A moved step loses its substream, its parked mark, and its place, and keeps its shore mark and its state.
+4. **A step for a task.** `streams.addTaskStep` adds a step for an existing task (`node_task_present` when the task is a step of the stream already). `streams.createTaskForStep` makes a task for a step with no record (`node_linked` when it has one), in a section or a project backlog.
+5. **A done step comes after done steps.** A done step after a step that is not done is refused (`node_gated`).
+
+### Substreams
+
+Table `substreams` (index `by_stream`): `streamId`, `title`, `order`, `parkedAt?`, `box?: {x, y, width, height, shore?}`, `removedAt?`. A substream is a named group of steps inside one stream. Its box is in board units from the now line (`x` the left edge, `y` the top edge), at least 80 × 48. The box does not grow or shrink with its steps. A park of a substream takes its steps off the board. An **ungroup** (`streams.removeSubstream`) soft-deletes the substream only: its steps stay on the lane, in no substream.
+
+### Drawings
+
+A drawing is in `streams.drawings`, not in a table. `line` has 2 points, `free` has 2 to 1000 points, and `text` has 1 point (the top-left corner) and a text (at most 2000 characters). The id comes from the client (`^[A-Za-z0-9_-]{1,64}$`), so `streams.addDrawing` with an id that exists changes nothing. A lane holds at most 500 drawings (`drawing_limit`). An empty text removes the drawing.
+
+### Undo and History
+
+The Waybill scope of a stream is `stream:<streamId>`. Each step gesture and each substream write is journaled in the scope of the home of the step. `streams.remove` sets `removedAt` only: one undo brings the lane back with its steps. The create of a stream, `createTaskForStep`, and each workspace write cannot be undone. `streams.historyState` gives up to 10 entries on each side. Undo and redo are `waybill.undo` and `waybill.redo` with `{scope: "stream:<id>"}` (`ops stream undo|redo`).
+
+### Workspaces
+
+Table `trident_workspaces`: `userId`, `title` (at most 60 characters), `order`, `streamIds`. A workspace is a named set of streams of one person in one org. It is personal, and no write of it is journaled. One person has at most 30 workspaces in an org (`workspaces_full`), and a workspace holds at most 50 streams (`workspace_full`). The last workspace cannot be deleted (`workspace_last`). A workspace list drops a removed stream.
+
+### Ops
+
+`streams.*` (each a mutation unless it says query). The step lists take 1 to 200 steps (`node_batch_too_large`), all in one stream (`node_plan_mixed`, `node_not_in_stream`).
+
+| Op | Args | Notes |
+|---|---|---|
+| `streams.list` (query) | `orgSlug` | `[{_id, title, description, state, order, hue, stepCount}]` |
+| `streams.get` (query) | `orgSlug, streamId` | `{stream, substreams, nodes}`. A bad or removed id gives `stream: null`. |
+| `streams.create` | `orgSlug, title, description?` | The stream ID. `stream_title_required`. |
+| `streams.update` | `orgSlug, streamId, title?, description?, state?` | Journals `stream.done`, `stream.pause`, `stream.reopen`, `stream.resume`, `stream.rename`, or `stream.edit`. |
+| `streams.setAttachments` | `orgSlug, streamId, attachments` | The full list. `stream_attachment_not_found`, `stream_attachments_limit`. |
+| `streams.setSize` | `orgSlug, streamId, width?\|null, shoreHeight?\|null, boxes?` | |
+| `streams.addDrawing`, `setDrawingText`, `moveDrawings`, `removeDrawings` | `orgSlug, streamId, …` | `drawing_invalid`, `drawing_limit`, `drawing_not_found` |
+| `streams.remove` | `orgSlug, streamId` | A soft delete. |
+| `streams.historyState` (query) | `orgSlug, streamId` | `{canUndo, undoLabel, canRedo, redoLabel, undo, redo}` |
+| `streams.setShore` | `orgSlug, nodeIds, shore, positions?` | `node_shore_state` |
+| `streams.setParked` | `orgSlug, nodeIds, parked` | |
+| `streams.createSubstream` | `orgSlug, streamId, title, nodeIds?, box?` | The substream ID. `substream_title_required`. |
+| `streams.updateSubstream` | `orgSlug, substreamId, title?, parked?` | |
+| `streams.removeSubstream` | `orgSlug, substreamId` | The ungroup. |
+| `streams.setSubstream` | `orgSlug, nodeIds, substreamId\|null, positions?` | |
+| `streams.placeSubstream` | `orgSlug, substreamId, box, positions?` | `substream_box_invalid`, `node_not_in_substream` |
+| `streams.setCrossRequires` | `orgSlug, nodeId, crossRequires` | `node_cross_invalid` |
+| `streams.moveSteps` | `orgSlug, nodeIds, streamId` | `node_requires_cycle`. Journaled in the target stream. |
+| `streams.createTaskForStep` | `orgSlug, nodeId, home: {kind: "subsection", subsectionId} \| {kind: "backlog", projectId}` | The task ID. `node_linked`. |
+| `streams.addTaskStep` | `orgSlug, streamId, taskId, shore?, state?, place?` | The step ID. `node_task_present`, `task_not_found`. |
+| `tridentWorkspaces.list` (query) | `orgSlug` | `[{_id, title, order, streamIds}]`, your own |
+| `tridentWorkspaces.ensure` | `orgSlug, streamIds` | Your first workspace, or a new "Workspace 1" |
+| `tridentWorkspaces.create` | `orgSlug, title?, streamIds?` | `workspaces_full`, `workspace_title_required`, `workspace_full` |
+| `tridentWorkspaces.update` | `orgSlug, workspaceId, title?, streamIds?` | `workspace_not_found` |
+| `tridentWorkspaces.remove` | `orgSlug, workspaceId` | A hard delete. `workspace_last`. |
+| `tridentWorkspaces.reorder` | `orgSlug, workspaceIds` | Each of your workspaces one time (`workspace_order_invalid`) |
+
+The step gestures of `plans.*` for a plan step and a stream step:
+
+| Op | Args | Notes |
+|---|---|---|
+| `plans.splitNode` | `orgSlug, nodeId, side: "from" \| "to", title?, boardPosition?, start?, shore?, assigneeUserId?` | `from`: the new step comes after the step; `to`: before it. `node_shore_invalid` (a shore split of a step that is not a planned stream step). |
+| `plans.splitBeside` | `orgSlug, nodeId, title?, boardPosition?, assigneeUserId?` | A new step beside the step: it copies `requires`, `crossRequires`, the substream, the state, and the shore mark. `node_gated` when the step is done. |
+| `plans.moveLinks` | `orgSlug, links: [{from, to}], end: "from" \| "to", target` | `node_links_apart`, `node_link_missing`, `node_link_exists`, `node_requires_cycle` |
+| `plans.removeLinks` | `orgSlug, links: [{from, to}]` | A link that is gone already is skipped. |
+| `plans.setStepState` | `orgSlug, nodeIds, state: "planned" \| "active" \| "done", positions?, shift?, shore?, boxes?` | `node_done_linked`, `node_record_done`, `node_gated` |
+| `plans.doneAndNext` | `orgSlug, nodeId, title?, assigneeUserId?, positions?, shift?, boxes?, boardPosition?` | The step is done, and a new active step comes after it. `node_not_doing` when the step is not in progress. |
+| `plans.setBoardPositions` | `orgSlug, positions: [{nodeId, x, y}], boxes?` | Each place is clamped into the zone of its step. |
+
 ## Comments
 
 Module `updates` (a Webcore component). Only tasks carry comments. A comment target is `{type: "task", id: <taskId>, tenant?: <orgSlug>}`.

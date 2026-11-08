@@ -1,16 +1,18 @@
 # Operations
 
-Work in NUU Operations through the `ops` CLI: projects, deliverables, sections, tasks and subtasks, task groups, the review queue, the people looped into a task, deployments and their inboxes, the route decision, addresses, deadlines, blockers, plans and the plan canvas, notepads, day plans, and `ops query`. The entry point is the main skill `sk-ops-use_operations`.
+Work in NUU Operations through the `ops` CLI: projects, deliverables, sections, tasks and subtasks, task groups, the review queue, the people looped into a task, Trident streams and workspaces, shares, holds, calendars and events, deployments and their inboxes, the route decision, addresses, deadlines, blockers, plans and the plan canvas, notepads, day plans, and `ops query`. The entry point is the main skill `sk-ops-use_operations`.
 
 The source moved from the NUU Operations Flint to the NUU Flint on 2026-10-21 (ops-command-1021). Version 0.2.0 follows the revamp of Ops: sections in four homes, no closer, the backlog as a section, subtasks, the task map, abstract deployments with an inbox, the hidden context, `ops headers`, `ops route`, and `ops search`.
 
 Version 0.3.0 (ops-cli-publish-1023) adds the main skill `sk-ops-use_operations`: an agent with no other context can do Operations work with it.
 
+Version 0.6.0 (ops-overnight-1109) adds Trident (streams, stream steps, substreams, drawings, and workspaces), shares, holds, calendars and events, the deliverable move, the locked section with the name of its home, and subtasks of one level. It removes `ops section priority` and `ops task subtask indent`, and it gives the data mode of Task 415 (a dev build uses PROD data by default).
+
 The shard teaches an agent the Operations data model, the plan canvas rules, the `ops` CLI, four workflows, and six skills. It owns no Mesh type and installs nothing into the Mesh. It comes from (Task) 297. (Task) 309 added `ops task context`. (Task) 320 made the CLI help, output, errors, and flags consistent and added `ops history`, `ops undo`, and `ops redo`; (Task) 327 brought this shard up to date with it, and with the review fixes and the `ops favourite` commands of (Task) 320.
 
 ## Prerequisite
 
-- The `ops` CLI: `ndv use ops dev` or `ndv use ops prod`. Both put the command `ops` on PATH. `ops mode` shows which build and which data it uses.
+- The `ops` CLI: `ndv use ops dev` or `ndv use ops prod`. Both put the command `ops` on PATH. `ops mode` shows which build and which data it uses. A dev build uses PROD data by default; set `OPS_DATA_MODE=dev` for dev data.
 - A signed-in nuu credential: `ops login`, `nuu login` (prod), or `ndv run nuu login` (dev).
 
 ## Structure
