@@ -54,7 +54,7 @@ Review one backlog and put it in order. A backlog is a section with the role `ba
 
 > [!headless]
 > 1. First, `flint orbh session set phase reading-backlog`.
-> 2. With no data mode in the prompt, use dev data. With no org, use `--org me`.
+> 2. With no data mode in the prompt, use dev data: run the dev launcher with `OPS_DATA_MODE=dev` (a dev build uses PROD data by default, Task 415). With no org, use `--org me`.
 
 ## Stage 2: Propose
 

@@ -30,7 +30,7 @@ Give a deliverable its sections, their order, their dependencies, their tasks, a
    ops deliverable create "<title>" --project <project> --section "<first section>" [--due YYYY-MM-DD] [--deployment <deployment>] [--context "<text>"] --json
    ```
 
-   Keep the deliverable ID, its address, and the ID of the first section. Ops makes no other section and no task. `--due` makes a deadline linked to the deliverable. `--deployment` names the deployment that it ships to.
+   Keep the deliverable ID, its address, and the ID of the first section. Ops also makes the **main section** of the deliverable (Task 406): a locked section with the name of the deliverable. It cannot be renamed, moved, archived, or deleted (`section_named_locked`), and a task with only `--deliverable` lands there. Ops makes no task. `--due` makes a deadline linked to the deliverable. `--deployment` names the deployment that it ships to.
 4. **Add the other sections, top first.** A new section goes to the end of its home, so a create in order gives the right order:
 
    ```bash

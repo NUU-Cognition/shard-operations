@@ -30,7 +30,7 @@ Create one task (or one subtask) in the right place, and check that Ops put it t
       |-------|------|
       | A section | `--section <ref>` |
       | The backlog of a project | `--project <ref>` |
-      | A deliverable (its first open section) | `--deliverable <ref>` |
+      | A deliverable (its main section: the named section) | `--deliverable <ref>` |
       | The inbox of a live deployment | `--deployment <ref>`, with `--tag feedback\|hotfix\|ongoing\|recurring` |
       | Under a task (a subtask, in the home of its root) | `--parent <task>` |
       | The master backlog of the org | `--master` (also the default when you give no place) |
@@ -47,7 +47,7 @@ Create one task (or one subtask) in the right place, and check that Ops put it t
    ops task create "<title>" <place flag> [--body <text> | --body-file <path>] [--priority low|medium|high|urgent] [--assign <member>] --json
    ```
 
-   - A subtask: `--parent <task>`, or `ops task subtask add <parent> "<title>" --json`. A tree has at most 6 levels below its root (`subtask_too_deep`).
+   - A subtask: `--parent <task>`, or `ops task subtask add <parent> "<title>" --json`. Subtasks have one level: the parent must be a root task, because a subtask has no subtasks (`subtask_too_deep`).
    - A recurring task: `--every day|week|month`. Its next copy comes in the same place when it is done.
    - The repository of the work: `--repo <name>` adds a `repo` related link.
    - For many tasks in one place, run one create for each task, in the order they must show. Do not use `--top` for a list: it writes a second gesture for each task.

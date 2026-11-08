@@ -50,7 +50,7 @@ The operator asks for something in Operations: read a record, create or change r
 > [!headless]
 > Do not ask the operator, and do not wait for a confirmation.
 > 1. First, `flint orbh session set phase grounding`.
-> 2. With no data mode in the prompt, use dev data. With no org in the prompt, use `--org me`.
+> 2. With no data mode in the prompt, use dev data: run the dev launcher with `OPS_DATA_MODE=dev` (a dev build uses PROD data by default, Task 415). With no org in the prompt, use `--org me`.
 > 3. Exit code 3: stop, and return the error with the sign-in command (`ops login`, `nuu login`, or `ndv run nuu login`): `flint orbh session return --finish "<result>"`.
 > 4. When the request has two readings, choose the narrower one and record the choice. Do not ask a question.
 > - Once the org, the data mode, and the commands are clear, progress to the next stage.

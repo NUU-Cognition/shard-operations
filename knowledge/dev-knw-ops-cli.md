@@ -1,5 +1,5 @@
 ---
-description: "Complete reference for the ops CLI after the revamp of ops-command-1021 — the model, a first session, install, modes, sign-in, the default org, references (IDs, addresses, URLs, titles, paths), places of --to, output and exit codes, every command family (headers, route, search, section, task with subtasks and the map, deliverable done, deployments and the inbox, blockers, notepads, the day plan), the read query (ops query), ops call, ops ops, and the undo guard"
+description: "Complete reference for the ops CLI after the revamp of ops-command-1021 — the model, a first session, install, modes, sign-in, the default org, references (IDs, addresses, URLs, titles, paths), places of --to, output and exit codes, every command family (headers, route, search, section, task with subtasks and the map, deliverable done, deployments and the inbox, blockers, notepads, the day plan, Trident streams and workspaces, shares, holds, calendars and events), the read query (ops query), ops call, ops ops, and the undo guard"
 orbh-sessions:
   - "[[3fb6e594-a179-4c0b-ba67-833b2ccaea67]]"
   - "[[4c4eadb7-6e8e-4529-8186-3bb1b5bdbc75]]"
@@ -221,7 +221,7 @@ An ID, URL, or address never needs a scope.
 |---|---|
 | `section:<ref>` | the section |
 | `project:<ref>` | the backlog section of the project (made on first need) |
-| `deliverable:<ref>` | the first open section of the deliverable (made when none) |
+| `deliverable:<ref>` | the main section of the deliverable (the named section, role `main`, Task 406; made when none) |
 | `deployment:<ref>` | the inbox section of the deployment |
 | `parent:<task>` (or `task:<task>`) | under the task, as a subtask |
 | `backlog` | the backlog section of the project of the task |
@@ -259,7 +259,9 @@ Gateway codes pass through: `unauthenticated`, `org_unauthorized`,
 `reorder_anchor_outside`, `position_unknown`, `confirm_required`,
 `place_ambiguous`, `place_not_found`, `deployment_no_inbox`. Codes of the
 revamp from the service: `task_has_subtasks` (a delete needs
-`--with-subtasks`), `subtask_too_deep` (6 levels), `subtask_cycle`.
+`--with-subtasks`), `subtask_too_deep` (one level: a subtask has no
+subtasks), `subtask_cycle`, `section_named_locked` (the named section of a
+project, a deliverable, or a deployment).
 
 An op that a deployment of Ops does not have yet fails with
 `agent_unknown_operation` and names the deploy. Where a former op can do the
@@ -337,6 +339,13 @@ reads stdin.
 
 `ops subsection …` is a hidden alias of `ops section …`.
 
+Each project, deliverable, and deployment has one **named section**: a
+locked section with the name of its home (Task 406; the role `backlog` of a
+project, `main` of a deliverable, `inbox` of a deployment). Its title follows
+the home. `update --title`, `move`, `archive`, `delete`, and `to-task` refuse
+it with `section_named_locked`. A task that names only the home lands there.
+A section has no priority (Task 413): `ops section priority` is gone.
+
 | Command | Example |
 |---|---|
 | `ops section list [--project <p> \| --deliverable <d> \| --deployment <d>] [--archived]` — `--project`: grouped by home (`sections.listForProject`); no scope: every section of the org with its path | `ops section list --project Alpha` |
@@ -377,7 +386,7 @@ reads stdin.
 | `ops task review cancel <task> [--to <member>]` — `reviews.cancel`: withdraw the open request that you made; when you asked more than one reviewer, `--to` names the reviewer (else `review_ambiguous`, exit 2, with the reviewers as candidates); `--json`: `{itemId, id, orgSlug, reviewerUserId, cancelled: true}` | `ops task review cancel <task>` |
 | `ops task loop add <task> <person>` — `taskLoops.add`: loop a member of the org into the task; the person follows the task beside its owner, hears every comment on it, and gets a notification; `<person>` takes `me` or a member as `--assign` does; a person in the loop already gives `no change`; a task loops in at most 50 people (`loop_full`); a review request loops in the reviewer, and a mention in a comment loops in the mentioned member; `--json`: `{id, orgSlug, userId, added}` | `ops task loop add <task> @ana` |
 | `ops task loop remove <task> <person>` — `taskLoops.remove`: take a person out of the loop of the task; a person who is not in it gives `no change`; `--json`: `{id, orgSlug, userId, removed}` | `ops task loop remove <task> @ana` |
-| `ops task holds <task>` — `holds.ofTask`: the hold of a task (a short lease of an actor on the task), or none | `ops task holds <taskId> --json` |
+| `ops task holds <task>` — `holds.ofTask`: the hold of a task (a lease of an actor, `take` or `chair`, 600 s by default), or none; while it holds, a NUU Connect write of another actor is refused with `held`. The CLI only reads holds | `ops task holds <taskId> --json` |
 
 #### Subtasks and the task map
 
@@ -858,7 +867,12 @@ Traps:
 ### share
 
 A share gives another org or one person access to one record of your org
-(`shares.*`). The permission is `reader` (the default) or `editor`. A
+(`shares.*`): a project, a deliverable, or a task, with the records inside
+it. The permission is `reader` (the default) or `editor`. Only an owner or
+an admin of the org (or the owner of a personal workspace) shares. A second
+share to the same subject changes the first. A share has no undo. The codes:
+`same-org`, `personal-target`, `org-unknown`, `self-target`,
+`person-unknown`, `not-reachable`, `view-only`, `owner-only`. A
 `<record>` is `task:<ref>`, `project:<ref>`, `deliverable:<ref>`, an ID, an
 address, or a web URL. A `<shareId>` is the ID of one access line (from
 `ops share list --json`).
@@ -874,8 +888,11 @@ address, or a web URL. A `<shareId>` is the ID of one access line (from
 
 ### calendar
 
-A calendar is a named, coloured set of events of the org. One calendar is
-your default: a new event goes there when you name no calendar.
+A calendar is a named, coloured set of events of the org (at most 50). One
+calendar is your default (a choice of each person; else the oldest): a new
+event goes there when you name no calendar. A delete of a calendar deletes
+its events. The colours: `water`, `fire`, `earth`, `air`, `sun`, `moon`,
+`muted`.
 
 | Command | Example |
 |---|---|
@@ -888,9 +905,13 @@ your default: a new event goes there when you name no calendar.
 
 ### event
 
-An event is a timed or an all-day item of a calendar. A **period** is an
-all-day event of more than one day: `--date <first day> --until <last day>`.
-An event can repeat, and it can attach to a task or a deadline.
+An event is a timed or an all-day item of a calendar. A timed event is at
+most 31 days; an all-day event is at most 731 days. A **period** is an
+all-day event of more than one day: `--date <first day> --until <last day>`
+(both days are in it). An event can repeat, and it can attach to a task or a
+deadline (at most 50 links). `--person` adds a member of the org (no invite);
+`--guest` adds a person outside NUU (no access). The model and the codes are
+in [[dev-knw-ops-data_model]] § Calendars and Events.
 
 | Command | Example |
 |---|---|
@@ -1013,7 +1034,7 @@ release session); before that, each one fails on prod with
 | Command | What it does, and its traps |
 |---|---|
 | `ops address <record> [--kind project\|deliverable\|section\|task\|deployment\|taskgroup\|notepad\|plan\|step\|deadline\|blocker]` | The address of any record: the display address (the alias, else the id form), the id address, the `nuu://ops/<type>/<id>` URI, and `canRename`. A project, a deliverable, a task, a task group, and a notepad have an address row. A section, a deployment, and a blocker have the id form only (`@v1/<org>/section/<id>#ops`, `@v1/<org>/blocker/<id>#ops`; a blocker reads it from `blockers.get`). A plan, a step, a deadline, and a day label have no address: use the ID. A title needs `--kind`. `moved: true` means that the text is an old alias or an old form: use the printed address. |
-| `ops address rename <record> <name>` / `ops address rename <record> --clear` | `addresses.rename`: set the alias of the address of a record, or remove it (the address goes back to the id form). The old alias still finds the record (`moved: true`). |
+| `ops address rename <record> <name>` / `ops address rename <record> --clear` | `addresses.rename`: set the alias of the address of a project, a deliverable, a task, a notepad, or a task group, or remove it. It needs owner rights. A deliverable is renamed inside its project, and its name cannot be removed (`name-required`). Other refusals: `name-taken` (with a suggestion), `name-invalid`, `name-like-id`, `name-reserved`. |
 | `ops people search <text> [--limit 1-50]`, `ops people show <@handle\|email\|user_id>` | The profiles in the scope of the active org. `people show` takes a `@handle`, an email, or a Clerk `user_` id; not `me`, and not the users-table id of `ops whoami`. `ops member list` gives the user rows that task owners and assignees use. |
 | `ops project link <project> <uri...>` | Links NUU Connect URIs (`nuu://<app>/<type>/<id>`) to a project. Each URI is stored one time; at most 50. A bad URI gives `connect_bad_request` (exit 1). `--json` gives `{id, connectRefs}`. |
 | `ops project unlink <project> <uri>` | Removes one URI. A URI that is not linked changes nothing. |

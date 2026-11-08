@@ -32,7 +32,7 @@ Turn a scope description into a deliverable in a project. The deliverable gets s
 
 1. Run `ops mode` and `ops whoami --json`. Use `--org` when the project belongs to another org.
 2. Make sure [[dev-knw-ops-data_model]] § Deliverables, § Sections, and § Deadlines are in context. Key rules:
-   - `ops deliverable create` makes no section and no task. `--section "<title>"` makes the first section in the same command.
+   - `ops deliverable create` makes the main section of the deliverable (Task 406: a locked section with the name of the deliverable; `section_named_locked` on a rename, move, archive, or delete) and no task. `--section "<title>"` makes a first plain section in the same command.
    - A new section goes to the end of its deliverable, or after the section that `--after` names.
    - Inside one deliverable, a dependency must point up: an upstream section must sit above its dependent.
    - A due date on a deliverable or a section is a deadline linked to it.
@@ -45,7 +45,7 @@ Turn a scope description into a deliverable in a project. The deliverable gets s
 
 > [!headless]
 > 1. First, `flint orbh session set phase reading-scope`.
-> 2. With no data mode in the prompt, use dev data. With no org, use `--org me`.
+> 2. With no data mode in the prompt, use dev data: run the dev launcher with `OPS_DATA_MODE=dev` (a dev build uses PROD data by default, Task 415). With no org, use `--org me`.
 > 3. If a deliverable with the same title exists in the project, do not create another. Return and report it: `flint orbh session return --finish "<result>"`.
 > 4. Create a project only when the prompt asks for a new project. If the named project does not exist and the prompt does not ask for one, return and report it.
 > - Once the scope and the project are clear, progress to the next stage.

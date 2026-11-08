@@ -1,8 +1,11 @@
 ---
-description: "The main skill of Operations: what Ops is, the model, the two modes and the sign-in, the org, references and places, --json and the error codes, the command for each job, ops query and ops call for any other read or write, ten recipes, the safety rules, and troubleshooting"
+description: "The main skill of Operations: what Ops is, the model (with Trident streams, shares, holds, calendars, and events), the two modes and the sign-in, the org, references and places, --json and the error codes, the command for each job, ops query and ops call for any other read or write, fifteen recipes, the safety rules, and troubleshooting"
 orb:
   - "@v1/nuucognition/session/9297d2a3-64c8-4d33-8c4c-76011ebae793#flint/nuu-operations"
-orbh-fleet: ops-cli-publish-1023
+  - "@v1/nuucognition/session/ce8895db-085b-4ef7-a9da-53395fff62a3#flint/nuu-operations"
+orbh-fleet:
+  - ops-cli-publish-1023
+  - ops-overnight-1109
 orbh-sessions:
   - "[[9297d2a3-64c8-4d33-8c4c-76011ebae793]]"
 ---
@@ -32,22 +35,27 @@ The model:
 |---|---|---|
 | **Org** | Holds every record. A team org (its slug) or the personal workspace (`me`). | `ops org list\|use\|show`, `ops member list` |
 | **Project** | A body of work in an org. It has a hidden context (Markdown for search and the route, not shown on the page). | `ops project …` |
-| **Deliverable** | A result of a project. A person marks it done (`ops deliverable done`); its sections do not. | `ops deliverable …` |
-| **Section** | A list of tasks. It has one **home**: a deliverable, a project, a deployment (its inbox), or the org. The backlog of a project is its section with the role `backlog`. The **master backlog** is the backlog section of the org. A section is done when all its root tasks are done. The former word is "subsection". | `ops section …`, `ops backlog show` |
+| **Deliverable** | A result of a project. A person marks it done (`ops deliverable done`); its sections do not. It can move to another project with its sections and tasks. | `ops deliverable …`, `ops deliverable move <d> --to <project>` |
+| **Section** | A list of tasks. It has one **home**: a deliverable, a project, a deployment (its inbox), or the org. The backlog of a project is its section with the role `backlog`. The **master backlog** is the backlog section of the org. A section is done when all its root tasks are done. Each project, deliverable, and deployment has one locked section with its name. A section has no priority. The former word is "subsection". | `ops section …`, `ops backlog show` |
 | **Task** | A work item in a section, or with no home (unplaced). It has a status (`todo`, `doing`, `done`), a priority, an owner, a body, and comments. | `ops task …` |
-| **Subtask** | A full task with a parent. A tree has at most 6 levels below the root. A subtask has the home of its root. A list shows root tasks with a count. A move takes the subtree. | `ops task subtask …`, `--parent` |
+| **Subtask** | A full task with a parent, **one level only**: a subtask has no subtasks (`subtask_too_deep`). A subtask has the home of its parent. A list shows root tasks with a count. A move takes the subtasks. | `ops task subtask add\|list\|children\|move\|reorder\|outdent`, `--parent` |
+| **Hold** | A short lease of an actor (a person or an agent) on a task, so that two actors do not work on one task at the same time. | `ops task holds <task>` |
 | **Task group** | A set of tasks that are done together. Each task stays a full task. | `ops task group …` |
 | **Review request** | A request that one person reviews a task (Task 402). It goes into **Your Reviews** of the web app (every org, oldest first) with a notification. The default reviewer is the owner of the task. The request loops the reviewer into the task. The reviewer approves (this closes the task), asks for changes, or dismisses. **Your Reviews** also lists the open requests that you asked of other people ("You asked for"). | `ops task review request\|approve\|changes\|dismiss\|cancel`, `ops review list` |
 | **Looped in** | The people who follow a task beside its owner (at most 50). Each one hears every comment on the task. A review request loops in the reviewer, and a mention in a comment loops in the mentioned member. | `ops task loop add\|remove <task> <person>`, `ops task show` |
 | **Lineage and links** | `split`, `merge`, `continue`, and `chain` link tasks. Related links point to a project, a deliverable, a repository, a Flint, or an address. Attachments link a session, a fleet, a note, or a repository. | `ops task split\|merge\|continue\|chain\|relate\|attach`, `ops task map` |
 | **Deployment** | What a project runs: a name, a free version label, a status (`live`, `paused`, `retired`), notes, and a context. A live deployment has an **inbox** section. Inbox tasks have a tag: `feedback`, `hotfix`, `ongoing`, or `recurring`. A check schedule adds a task "Check <deployment>" each period. | `ops deployment …` |
 | **Plan and step** | A plan is a canvas: a graph of steps with `requires` edges, positions, and links to records. | `ops plan …`, `ops step …` |
+| **Stream (Trident)** | A lane of work on the Trident board, with a state (`active`, `paused`, `done`) and the places that it serves (projects, deliverables, sections). Its steps are plan steps in zones: planned (with the **shore** of goals on top), active, and done. A step can be parked, be in a **substream** (a named group with a box), and have cross links to the steps of other streams (they gate nothing). | `ops stream …`, `ops stream step …`, `ops step …` with `--stream` |
+| **Workspace (Trident)** | A named set of streams of one person. | `ops workspace …` |
 | **Deadline** | A dated record in a graph: it attaches to records, it can require other deadlines, and it has assignees. | `ops deadline …` |
 | **Blocker** | Why work waits: a title, what it waits on, the next step, an owner, and the next check-up date. It links records and gates no status. Open, resolved, or dropped. | `ops blocker …` |
 | **Notepad** | Markdown text with task mentions (`[[task:<id>\|<title>]]`). General (the org sees it) or personal. | `ops notepad …` |
 | **Comment** | A post on the Updates timeline of a task. | `ops comment …` |
 | **Day plan** | Your own ordered list of tasks for one date. Personal only. | `ops day …` |
 | **Day label** | A label on a range of calendar days of the org. | `ops day-label …` |
+| **Calendar and event** | A calendar is a named, coloured set of events; one is your default. An event is timed, all-day, or a **period** (an all-day event of more than one day). It can repeat, and it can attach to a task or a deadline. | `ops calendar …`, `ops event …` |
+| **Share** | Access to one record (a task, a project, a deliverable) for another org or one person, as `reader` or `editor`. | `ops share …` |
 | **Address** | The stable name of a record: `@v1/<org>/<kind>/<key>#ops` (for example `@v1/acme/task/<id>#ops`). A project, a deliverable, a task, a task group, and a notepad have an address row (an alias, else the id form). A section and a deployment have the id form only (`@v1/<org>/section/<id>#ops`). A plan, a step, a deadline, a day label, and a blocker have no address: use the ID. | `ops address <record>`, any record argument |
 | **Person** | A profile in the scope of the org. `ops member list` gives the user rows that owners and assignees use. | `ops people search\|show`, `ops member list` |
 | **Waybill** | The activity log and the undo and redo stacks of each scope. | `ops activity list`, `ops history`, `ops undo`, `ops redo` |
@@ -59,15 +67,17 @@ Personal records: notifications (`ops notify`), favourites (`ops favourite`), an
 There are two builds of the CLI. The build decides the data.
 
 - **Install.** The npm package is `@nuucognition/ops-cli`. It is ready but **not published yet**. After the publish: `npm install -g @nuucognition/ops-cli`. It needs Node.js 24 or newer (an older Node gives `node_too_old`, exit 1). The package has one command, `ops`: the prod build. `ops-dev` exists only in the monorepo.
-- **Sign-in.** `nuu login`, `flint login`, and `ops login` write the same prod credential, `~/.nuucognition/auth.json`. A machine that is signed in to flint needs no other step. The dev build uses `~/.nuucognition/auth.local.json`.
+- **Sign-in.** `nuu login`, `flint login`, and `ops login` write the same prod credential, `~/.nuucognition/auth.json`. A machine that is signed in to flint needs no other step. A dev build on dev data uses `~/.nuucognition/auth.local.json`.
 
 | Command | Build | Data | Convex deployment | Credential |
 |---|---|---|---|---|
 | `ops` | prod | always PROD (ignores `OPS_DATA_MODE`) | `acoustic-weasel-248` | `~/.nuucognition/auth.json` (`nuu login`) |
-| `ops-dev` | dev | DEV by default; `ops-dev mode prod` moves it to prod data | `next-dalmatian-912` | `~/.nuucognition/auth.local.json` |
+| `ops-dev` | dev | **PROD by default** (Task 415); `OPS_DATA_MODE=dev` gives DEV data | `acoustic-weasel-248` (prod), `next-dalmatian-912` (dev) | `auth.json` (prod), `auth.local.json` (dev) |
+
+A dev build takes the first choice that it finds: `OPS_DATA_MODE`, a test run (dev data), `NUU_DATA_MODE`, the shared file `~/.nuucognition/dev-data.json` (`ops mode dev|prod` and `flint env use` write it), then prod. On prod data it prints one stderr note: each write is real.
 
 1. Run `ops mode` (or `ops-dev mode`). Read the lines `build mode` and `data mode`. Write only when the data mode is the data of the request. A test write goes to DEV data.
-2. When `ops-dev` is not on PATH, run the dev launcher of the monorepo: `node "<monorepo>/apps/cli-ops/bin/ops.js" <command>` (`<monorepo>` is `Repos/main` of the Tinderbox). It is always a dev build. In the monorepo, `ndv use ops dev|prod` links the command `ops` to one build: then `ops mode` tells you which.
+2. When `ops-dev` is not on PATH, run the dev launcher of the monorepo: `OPS_DATA_MODE=dev node "<monorepo>/apps/cli-ops/bin/ops.js" <command>` (`<monorepo>` is `Repos/main` of the Tinderbox). It is always a dev build. Without `OPS_DATA_MODE=dev`, it uses PROD data. In the monorepo, `ndv use ops dev|prod` links the command `ops` to one build: then `ops mode` tells you which.
 3. Run `ops whoami`. It shows the user, the email, the data mode, and the active org. `ops --version` prints the version of the package. When a command fails with `auth_required` or `unauthenticated` (exit 3), the operator signs in: `nuu login` (or `ops login`, the sign-in of the current data mode, in a browser). An agent cannot sign in: ask the operator to run `nuu login`, or report it.
 4. Run `ops --help` one time. It lists the command groups. When it does not list `headers`, `route`, `search`, and `section`, the build is of before the revamp: stop and report it.
 
@@ -93,7 +103,7 @@ The day plan is personal: `ops day` takes no team org (`day_plan_personal_only`,
 3. Find a person: `ops people search "<text>"` and `ops people show <@handle|email|user_id>`. `people show` takes a `@handle`, an email, or a Clerk `user_` id; it does not take `me` or the users-table id that `ops whoami` gives. Get the address of any record: `ops address <record> [--kind <kind>]` (a title needs `--kind`; `moved: true` means that you typed an old alias: use the printed address).
 4. Name a record by one of these **references**: an ID, an address, a web URL, a title, or a path (`"Alpha › v1 › Backend"`; `›`, `>`, and `/` are the same separator). Prefer the address: it never needs a scope and never matches two records.
 5. When a title matches more than one record, the command fails with `<kind>_ambiguous` (exit 2) and lists the candidates with their IDs and paths. Run it again with the ID or the address. Never guess between candidates.
-6. A **place** (`--to` of `ops task move`) is `section:<ref>`, `project:<ref>` (its backlog), `deliverable:<ref>` (its first open section), `deployment:<ref>` (its inbox), `parent:<task>` (a subtask), `backlog`, `master`, or `unplaced`. A **link spec** (deadline, step, and blocker links) is `kind:ref`, a URL, an address, or an ID; a title needs the kind prefix (`task:"Write docs"`).
+6. A **place** (`--to` of `ops task move`) is `section:<ref>`, `project:<ref>` (its backlog), `deliverable:<ref>` (its main section: the named section), `deployment:<ref>` (its inbox), `parent:<task>` (a subtask), `backlog`, `master`, or `unplaced`. A **link spec** (deadline, step, and blocker links) is `kind:ref`, a URL, an address, or an ID; a title needs the kind prefix (`task:"Write docs"`).
 
 ## 5. Read before you change
 
@@ -115,17 +125,21 @@ Use the first command that fits. `ops <noun> <verb> --help` gives the flags and 
 | **Create** a place | `ops project create [--deployment <d>]`, `ops deliverable create <title> --project <p>`, `ops section create <title> --project\|--deliverable\|--deployment <ref>`, `ops deployment create <name> --project <p>` |
 | **Change** a task | `ops task update <task> --title\|--body\|--priority\|--assign\|--tag\|--every`, `ops task start\|done\|reopen\|close\|result <task>` (a task has no outcome: `close` takes only `--result`) |
 | **Loop** a person into a task | `ops task loop add <task> <person>` (the person hears every comment, and gets a notification), `ops task loop remove <task> <person>`; `ops task show` names the people looped in |
-| **Ask for a review** of a task, or give the verdict | `ops task review request <task> [--to <member>] [--note <text\|->]` (the owner by default); the reviewer: `ops task review approve <task> [--keep-open]`, `changes <task> [--note <text>]`, `dismiss <task>`; the requester: `ops task review cancel <task> [--to <member>]`; the queue and the open requests that you asked for: `ops review list [--org <org>] [--state open\|all]` |
-| **Change** a place | `ops <noun> update <ref> …` (`ops project update <p> --deployment <d\|none>`: the deployment that a project ships to), `ops <noun> context set <ref> "<md>"`, `ops section priority\|archive\|deps`, `ops deployment status\|schedule\|check` |
-| **Move** and order | `ops task move <tasks...> --to <place>`, `ops task reorder <task> --before\|--after <t>`, `ops section move\|reorder`, `ops task subtask …` ([[dev-sk-ops-move_tasks]]) |
+| **Ask for a review** of a task, or give the verdict | `ops task review request <task> [--to <me\|member>] [--note <text\|->]` (the owner by default; a team task with no owner refuses with `review_no_reviewer`: give `--to`); the reviewer: `ops task review approve <task> [--keep-open]`, `changes <task> [--note <text>]`, `dismiss <task>`; the requester: `ops task review cancel <task> [--to <member>]`; the queue and the open requests that you asked for: `ops review list [--org <org>] [--state open\|all]` |
+| **Change** a place | `ops <noun> update <ref> …` (`ops project update <p> --deployment <d\|none>`: the deployment that a project ships to), `ops <noun> context set <ref> "<md>"`, `ops section archive\|deps`, `ops deployment status\|schedule\|check`, `ops address rename <record> <name\|--clear>` (the alias of an address) |
+| **Move** and order | `ops task move <tasks...> --to <place>`, `ops task reorder <task> --before\|--after <t>`, `ops section move\|reorder`, `ops deliverable move <d> --to <project>`, `ops task subtask …` ([[dev-sk-ops-move_tasks]]) |
 | **Group** and link tasks | `ops task group create\|add\|remove\|update` (`--json` of `create` and `update` gives `groupId`, not `id`); lineage: `ops task continue` (makes a NEW task), `ops task link <task> <previous>` (links two tasks that exist as continues-from, closes nothing), `ops task unlink <task> [--kind after]`, `ops task chain\|unchain` (the `after` links), `ops task split\|merge`; `ops task relate\|attach` |
 | **Tie an agent session** to tasks | `ops task session-state <session-id> <state>` (the state on every attachment of the session); a station workflow: `ops task launch accept <launch-id> --station <address> --machine-id <id> --text-file <path>` before any work, then work only on the task and org that it returns |
 | **Plan** work | `ops plan create\|show`, `ops step add\|move\|requires\|links` ([[dev-wkfl-ops-plan_layout]], [[dev-knw-ops-canvas]]); a deliverable with sections: [[dev-sk-ops-plan_deliverable]] |
+| **Run a lane** (Trident) | `ops stream list\|show\|create\|update\|delete\|attach\|detach\|size\|history\|undo\|redo`, `ops stream step add\|add-task\|create-task\|move\|park\|unpark\|shore\|unshore\|cross\|substream`, `ops stream substream create\|rename\|park\|unpark\|place\|ungroup`, `ops stream drawing list\|add\|text\|move\|remove`, `ops workspace list\|show\|create\|update\|streams\|reorder\|delete` |
+| **Change a step** (plan or stream) | `ops step split <step> [--before]`, `ops step split-beside <step>`, `ops step state <planned\|active\|done> <steps...>`, `ops step done-next <step>`, `ops step move-links --link <from>:<to> --end from\|to --target <step>`, `ops step remove-links <from>:<to>`, `ops step place <step> --x --y`; a stream step title needs `--stream <stream>` |
+| **Share** a record | `ops share list\|access <record>`, `ops share add <record> --to org:<slug>\|person:<member> [--permission reader\|editor]`, `ops share permission <shareId> <reader\|editor>`, `ops share remove <shareId>`, `ops share with` |
+| **Calendar** and events | `ops calendar list\|show\|create\|update\|delete\|default`, `ops event list [--from <day>] [--days <n>]`, `ops event create <title> (--start <dt> --end <dt> \| --date <day> [--until <day>]) [--repeat …] [--attach task:<ref>]`, `ops event update\|delete <event> [--occurrence <day>] [--scope this\|following\|all]`, `ops event attach\|detach\|for` |
 | **Schedule** | `ops deadline create\|shift\|links\|requires\|assign`, `ops day candidates --date today` (open tasks of every org, the planned ones marked; personal: no team `--org`), then `ops day add <taskId>...`, `ops day show\|reorder\|carry`, `ops day-label create`, `ops deployment schedule` |
 | **Block** and unblock | `ops blocker create <title> --check <date> --on <record>`, `ops blocker list --due`, `ops blocker delay <blocker> <date>` (the date is an argument, not `--to`), `ops blocker resolve\|drop\|reopen` |
-| **Comment** | `ops comment list\|add\|edit\|react <task> …` |
+| **Comment** | `ops comment list\|add\|edit\|react <task> …`, `ops comment count <tasks...>`, `ops comment people` (who you can mention) |
 | **Write notes** | `ops notepad create\|show\|append\|write\|to-task\|move-to-task`, `ops notepad mentions <task>` (the notepads with a chip of the task), `ops notepad share <n> --general\|--personal` (who reads it; `ops notepad scope` is different: it links a section) |
-| **Review history** | `ops activity row <record>` (who changed one record, and when; the record is an ID, a URL, or an Ops address, also of a notepad), `ops activity list [--on <record>] [--mine] [--action <a>]` (the feed of a scope), `ops activity facets` (the actor and action values for `--action`), `ops history --on <record>`, `ops notify list\|count\|read-key <key>` |
+| **Review history** | `ops activity row <record>` (who changed one record, and when; the record is an ID, a URL, or an Ops address, also of a notepad), `ops activity list [--on <record>] [--mine] [--action <a>]` (the feed of a scope), `ops activity facets` (the actor and action values for `--action`), `ops history --on <record>`, `ops notify list\|count\|read-key <key>\|read-prefix <prefix>\|dismiss-all`, `ops task holds <task>` |
 | **Undo** | `ops history --on <record>`, then `ops undo --on <record> --expect <seq>` (or `ops plan history\|undo <plan>`) |
 | **Triage** an inbox or a backlog | [[dev-sk-ops-triage_inbox]], [[dev-wkfl-ops-backlog_triage]] |
 | **Finish** a deliverable | `ops deliverable done\|reopen <d>`: a person decides; ask the operator first |
@@ -223,6 +237,41 @@ Each recipe uses `--org <org>` when the org is not the active one. Use `--json` 
     ops undo --on <record> --dry-run       # see what the undo replays
     ops undo --on <record> --expect <seq>
     ```
+11. **Run a lane of work on the Trident board.**
+    ```bash
+    ops stream create "Launch lane" --description "The work of the v1 launch" --json
+    ops stream attach "Launch lane" project:Alpha deliverable:"Alpha › v1 launch"
+    ops stream step add "Launch lane" "Ship the beta" --shore          # a goal on the shore
+    ops stream step add-task "Launch lane" <taskId>                    # a step that is a task
+    ops step state active <stepId>                                     # planned → active
+    ops step done-next <stepId> --title "Write the release notes"     # done, and the next active step
+    ops stream show "Launch lane" --json                               # the steps by zone
+    ```
+    A stream step title needs `--stream <stream>`. Undo a lane gesture with `ops stream history <stream>`, then `ops stream undo <stream> --expect <seq>`.
+12. **Move a deliverable to another project.**
+    ```bash
+    ops deliverable show "Alpha › v2" --json          # read what goes with it: its sections and tasks
+    ops deliverable move "Alpha › v2" --to Beta --json
+    ```
+13. **Share a record with a person or another org.**
+    ```bash
+    ops share list project:Alpha --json               # the access lines that exist
+    ops share add project:Alpha --to person:@ana --permission reader
+    ops share remove <shareId>                        # after the operator confirms
+    ```
+14. **Put a period on a calendar.**
+    ```bash
+    ops calendar list --json
+    ops event create "Launch week" --date 2026-11-16 --until 2026-11-20 --calendar Team --attach task:<taskId>
+    ops event list --from 2026-11-16 --days 7
+    ```
+    A timed event takes `--start "<YYYY-MM-DD HH:mm>" --end "<…>" [--tz <zone>]`. A change of one day of a repeated event takes `--occurrence <day> --scope this`.
+15. **Ask for a review of your work.**
+    ```bash
+    ops task result <task> "<what the work gave>. Commits: <sha> (<repo>)."
+    ops task review request <task> --note "<the summary, the commits, and what to check>" --json
+    ```
+    With no `--to`, the reviewer is the owner of the task. A team task with no owner refuses with `review_no_reviewer`: give `--to <member>` (or `--to me`). Ask before a close: a close cancels the open requests.
 
 # Safety Rules
 
@@ -230,7 +279,7 @@ Each recipe uses `--org <org>` when the org is not the active one. Use `--json` 
 2. **Act as the operator.** Each write is the operator's own write; Waybill records the operator as the actor, with the agent mark. Change only the records that the request names, in the org that it names.
 3. **Read before a delete.** A delete of a project or a deliverable (and of a deployment) needs an org owner or admin (`owner-only`). An agent that is a member archives a project (`ops project update <p> --status archived`), retires a deployment (`ops deployment status <d> retired`), and marks a deliverable done after the operator confirms. A delete can cascade: a project takes its deliverables, sections, and tasks; a deliverable takes its sections and tasks; a section takes its tasks; a plan takes its steps. The CLI refuses these deletes without `--yes` (`confirm_required`, exit 2): project, deliverable, section, deployment, plan, and blocker. `ops task delete` and `ops notepad delete` take no `--yes`: read first. A task with subtasks needs `--with-subtasks`. Tell the operator what goes, and add `--yes` only after the operator confirms.
 4. **Undo only what you read.** Undo replays your last gesture in a scope, and that gesture can be one that the operator made in the web app. Read `ops history` first and pass `--expect <seq>`. The CLI refuses an undo or a redo without `--expect` (`expect_required`) unless you pass `--dry-run`. A blocker write is a Waybill gesture in the scope `org:<org>`: use `ops history --scope org:<org>` and `ops undo --scope org:<org> --expect <seq>`. A comment delete and a blocker delete cannot be undone: resolve or drop a blocker instead of a delete.
-5. **Respect what a person decides.** Do not mark a deliverable done or mark all notifications read unless the operator asks.
+5. **Respect what a person decides.** Do not mark a deliverable done, mark all notifications read, dismiss all notifications (`ops notify dismiss-all`), share a record, remove a share, or move a deliverable to another project unless the operator asks.
 6. **Do not repeat a write blindly.** A network error (exit 4) or `bad_response` can come after the service saved the write. Read the record or the list first. Repeat the write only when it did not land. Never repeat a create or a comment without that check.
 7. **Keep titles exact.** A task title that ends with a space and one digit (`0`–`7`) loses the digit: Ops reads it as the rarity.
 8. **Use only the CLI.** Do not call Convex directly, and do not edit the files of the credential.
@@ -250,7 +299,12 @@ Each recipe uses `--org <org>` when the org is not the active one. Use `--json` 
 | `confirm_required` | The delete needs `--yes`. Read what it removes, ask the operator, then add `--yes`. |
 | `expect_required`, `undo_state_changed`, `nothing_to_undo` | Read `ops history --on <record>` again, and pass the `seq` of the head entry with `--expect`. |
 | `subsection_blocked`, `section_blocked` | An upstream section is not done. Finish it, or tell the operator. |
-| `task_has_subtasks`, `subtask_too_deep`, `subtask_cycle` | Read the subtasks (`ops task subtask list <task>`); use `--with-subtasks`, a higher parent, or another parent. |
+| `task_has_subtasks`, `subtask_too_deep`, `subtask_cycle` | Read the subtasks (`ops task subtask list <task>`). A subtask has no subtasks: put the task under a root task, or make it a root task (`ops task subtask outdent <task>`). A delete of a task with subtasks needs `--with-subtasks`. |
+| `unknown command 'indent'` | `ops task subtask indent` is gone: subtasks have one level. Use `ops task subtask move <task> --under <root task>`. |
+| `unknown command 'priority'` | `ops section priority` is gone (Task 413): a section has no priority. Set the priority of a task: `ops task update <task> --priority <p>`. |
+| `stream_not_found`, `node_not_in_stream`, `node_plan_mixed` | The stream is missing or deleted, the step is a plan step, or the steps are in more than one home. Run `ops stream list` and `ops stream show <stream>`. |
+| `node_shore_state`, `node_done_linked`, `node_gated`, `node_not_doing` | Only a `todo` step goes on the shore; a step with a record link follows its record; a done step needs its steps before it done; `done-next` needs an active step. |
+| `workspace_full`, `workspaces_full`, `workspace_last` | A workspace holds at most 50 streams; you have at most 30 workspaces in an org; the last workspace cannot be deleted. |
 | `deployment_no_inbox` | The deployment is not live. `ops deployment status <d> live` makes its inbox. |
 | `owner-only` | A delete of a project, a deliverable, a deployment, or a shared (general) notepad of a team org needs an org owner or admin. Archive the project or retire the deployment. For a shared notepad, ask an owner or an admin to delete it; do not change its scope to get around the check. |
 | `connect_bad_request` (exit 1) | `ops project link` got a bad URI. A NUU Connect URI is `nuu://<app>/<type>/<id>`. |

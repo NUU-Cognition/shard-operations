@@ -21,7 +21,7 @@ orbh-fleet: ops-command-1021
 
 This shard lets an agent work in the NUU Operations web app. The agent uses the `ops` CLI. The CLI calls the Operations agent gateway, and the gateway calls the same Convex functions that the web app calls. Thus an agent write has the same checks, the same activity log (Waybill) entries, and the same notifications as a write in the web app.
 
-Load this shard when a request touches Operations records: projects, deliverables, sections, tasks and subtasks, task groups, review requests, the people looped into a task, backlogs, deployments and their inboxes, deadlines, blockers, plans and plan steps, comments, notifications, activity, day labels, favourites, notepads, or the day planner.
+Load this shard when a request touches Operations records: projects, deliverables, sections, tasks and subtasks, task groups, review requests, the people looped into a task, backlogs, deployments and their inboxes, deadlines, blockers, plans and plan steps, Trident streams and workspaces, shares, holds, calendars and events, comments, notifications, activity, day labels, favourites, notepads, or the day planner.
 
 **Start here: [[dev-sk-ops-use_operations]].** It is the main skill of this shard. It gives the model, the builds and the sign-in, the org, references and places, the command for each job, `ops query` and `ops call` for any other read or write, ten recipes, the safety rules, and troubleshooting. Follow it for any Operations request. The other skills and workflows go deeper on one job.
 
@@ -32,13 +32,15 @@ For the task primitive of Task 1287 (the close and the result, lineage, task gro
 Operations (Ops) is the delivery record of a person and of an organisation. The model, since the revamp of ops-command-1021 (2026-10-21):
 
 1. An **org** holds **projects**. A project has a hidden **context** (Markdown for search and suggestions).
-2. A project has **deliverables**. A person marks a deliverable done (`ops deliverable done`). There is no closer and no "Delivered" task.
-3. A **section** is a list of tasks. It has one home: a deliverable, a project (no deliverable yet), a deployment (its inbox), or the org. The former word is "subsection".
+2. A project has **deliverables**. A person marks a deliverable done (`ops deliverable done`). There is no closer and no "Delivered" task. A deliverable can move to another project with its sections and tasks (`ops deliverable move <d> --to <project>`).
+3. A **section** is a list of tasks. It has one home: a deliverable, a project (no deliverable yet), a deployment (its inbox), or the org. The former word is "subsection". Each project, deliverable, and deployment has one **locked section with its name** (Task 406). A section has no priority (Task 413).
 4. The **backlog** of a project is its section with the role `backlog`. The **master backlog** is the backlog section of the org.
-5. A **task** lives in a section, or it has no home (unplaced). A task can have **subtasks**: full tasks in a tree, at most 6 levels below the root. A subtask has the home of its root. Lists show root tasks, each with a count.
+5. A **task** lives in a section, or it has no home (unplaced). A task can have **subtasks**: full tasks with a parent, **one level only**. A subtask has no subtasks (`subtask_too_deep`). A subtask has the home of its parent. Lists show root tasks, each with a count. A **hold** is a short lease of an actor on a task (`ops task holds <task>`).
 6. A **deployment** is abstract: a name, a free version label, a status (`live`, `paused`, `retired`), notes, and a context. A live deployment has an **inbox** section for the tasks that come up while it runs (tags `feedback`, `hotfix`, `ongoing`, `recurring`). A check schedule adds a check-up task. A deliverable can start from the inbox and ship to the deployment.
 7. Each project, deliverable, section, task, deployment, and notepad has an **address**: `@v1/<org>/<kind>/<key>#ops`. Every command prints it. Name a record by its address when you have it.
-8. **Deadlines** own dates and attach to records. **Plans** are graphs of steps across projects. **Notepads** hold text with task mentions.
+8. **Deadlines** own dates and attach to records. **Plans** are graphs of steps across projects. **Notepads** hold text with task mentions. **Calendars** hold **events**: a timed event, an all-day event, or a **period** (an all-day event of more than one day). An event can repeat and can attach to a task or a deadline.
+11. **Trident** is the stream board. A **stream** is a lane of work with steps in zones (the shore and planned, active, done), parked steps, substreams, cross links to other streams, drawings, and the places that it serves. A **workspace** is a named set of streams of one person.
+12. A **share** gives another org or one person access to one record (`reader` or `editor`).
 9. **Blockers** say why work waits: what it waits on, the next step, an owner, and the next check-up date. A blocker links records and gates no status. It is open, resolved, or dropped.
 10. A task has no type, no stage, and no outcome: its state is its status and its result. The people **looped in** follow a task beside its owner and hear every comment. A **task group** is a set of tasks that are done together. A **day plan** is the ordered tasks of one person for one date.
 
@@ -50,8 +52,10 @@ org
 │   └── deployment ── section (inbox) ── task
 ├── section (backlog: the master backlog)
 ├── deadlines, blockers, plans ── steps, day labels, notepads, task groups
+├── streams ── steps (shore, planned, active, done), substreams, drawings
+├── calendars ── events (timed, all-day, periods), shares of records
 └── activity (Waybill), notifications, comments on tasks
-person: a day plan per date, favourites per org
+person: a day plan per date, favourites per org, Trident workspaces per org
 ```
 
 The service derives some states. A section is done when all its root tasks are done. A deliverable is done only when a person marks it. Read [[dev-knw-ops-data_model]] for every entity, field, rule, and error code. Read [[dev-knw-ops-canvas]] before you place or move plan steps.
@@ -66,6 +70,7 @@ The service derives some states. A section is done when all its root tasks are d
 | See where a new task belongs | `ops route "<text>"` |
 | Create a task in the right place | `ops task create "<title>" --section|--project|--deliverable|--deployment|--parent <ref>`, or `--route` |
 | Move tasks (with their subtasks) | `ops task move <tasks...> --to <place>` |
+| Move a deliverable to another project | `ops deliverable move <deliverable> --to <project>` |
 | See a task with its home, groups, and lineage | `ops task map <task>` |
 | Plan a deliverable | `ops deliverable create … --section <title>`, `ops section create`, `ops section reorder`, `ops section deps` |
 | Finish or reopen a deliverable | `ops deliverable done|reopen <deliverable>` (ask the operator first) |
@@ -73,6 +78,12 @@ The service derives some states. A section is done when all its root tasks are d
 | Give a place its context | `ops project|deliverable|section|deployment context set` |
 | Record why work waits, and follow it up | `ops blocker create <title> --check <date> --on <record>`, `ops blocker list --due`, `ops blocker delay|resolve|drop` |
 | Plan your day | `ops day show|add|reorder|carry` |
+| Ask for a review of a task, give the verdict, read your queue | `ops task review request|approve|changes|dismiss|cancel <task>`, `ops review list` |
+| Run a lane of work on the Trident board | `ops stream list|show|create|update|attach`, `ops stream step add|add-task|move|park|shore`, `ops stream substream …`, `ops workspace …` |
+| Split a step, set its state, or move its links | `ops step split|split-beside|state|done-next|move-links|remove-links|place` (a plan step or a stream step) |
+| Share a record with another org or a person | `ops share list|add|permission|remove <…>`, `ops share with` |
+| See who holds a task | `ops task holds <task>` |
+| Put a meeting, a day, or a period on a calendar | `ops calendar list|create|default`, `ops event create <title> (--start … --end … \| --date <day> [--until <day>])`, `ops event list --from today --days 7` |
 | Answer a question that no command answers | `ops query <table> --where <field><op><value>` (see [[dev-sk-ops-use_operations]] § 7) |
 | Run an op that no command has | `ops ops`, then `ops call <op> '<json>'` |
 
@@ -136,7 +147,7 @@ The CLI acts in the active organisation: `--org <slug|name|me>` on the command l
 The gateway accepts the operator's credential. So every write is the operator's own write, and Waybill records the operator as the actor. The gateway also adds an agent mark to the write. Each Waybill event of the write has `context.via: {kind: "agent", client?, session?}`, and its notification has `data.via` except for comment notifications, which have no agent mark. The CLI sends `client` (`ops-cli/<version>`) and, when `ORBH_SESSION_ID` is set, `session`. The activity log and the task timeline show a small "via agent" label after the operator's name. A comment that `ops comment add` writes stores the same mark as its `via`, and the task timeline shows the label after the comment author (Task 357). The mark is a label only: it changes no access, and it does not change the actor or undo. A comment edit, a reaction, `waybill.undo`, `waybill.redo`, and notification reads carry no mark. Prod data shows the mark since the prod deploy of Operations 0.6.0 (Task 331; for comments, Task 357). Obey these rules.
 
 1. **Act as the operator.** Do only what the operator asked, in the organisation the operator named. Do not change records that the request does not name.
-2. **Check before a delete.** A delete can cascade. `projects.remove` deletes every deliverable, section, and task of the project. `deliverables.remove` deletes its sections and tasks. `sections.remove` deletes its tasks. A task with subtasks needs `--with-subtasks`, and then its subtree goes too. `plans.remove` deletes every step and cannot be undone in practice. Before a delete, read the record and what it holds, and tell the operator what goes with it. The CLI refuses these deletes without `--yes` (`confirm_required`, exit 2): `ops project delete`, `ops deliverable delete`, `ops section delete`, `ops deployment delete`, `ops plan delete`, and `ops blocker delete`. Add `--yes` only after the operator confirms.
+2. **Check before a delete.** A delete can cascade. `projects.remove` deletes every deliverable, section, and task of the project. `deliverables.remove` deletes its sections and tasks. `sections.remove` deletes its tasks. A task with subtasks needs `--with-subtasks`, and then its subtree goes too. `plans.remove` deletes every step and cannot be undone in practice. `ops calendar delete` deletes each event of the calendar. `ops stream delete` is a soft delete (`ops stream undo` brings the lane back), and `ops workspace delete` removes only the set of streams. Before a delete, read the record and what it holds, and tell the operator what goes with it. The CLI refuses these deletes without `--yes` (`confirm_required`, exit 2): `ops project delete`, `ops deliverable delete`, `ops section delete`, `ops deployment delete`, `ops plan delete`, and `ops blocker delete`. Add `--yes` only after the operator confirms.
 3. **Use `--json`.** Parse the JSON output. Do not parse the short text output. Take IDs from the JSON, and never construct or guess an ID.
 4. **Never undo without reading the history.** Undo acts on the operator's last action in a scope, and that action can be one the operator made in the web app. Read the scope history first (`ops history --on <record>`, or `ops plan history <plan>`), confirm that the head entry is the action you expect, and pass its `seq` with `--expect <seq>`. The CLI refuses an undo or a redo without `--expect` (`expect_required`) unless you pass `--dry-run`. See [[dev-knw-ops-data_model]] § Undo and Redo.
 5. **Clean up test records.** When you create records only to test, delete them when the test is done. Report every record you could not delete.
@@ -162,9 +173,9 @@ Every command that shows a task or a place prints its web link or its address. T
 
 Read [[dev-knw-ops-cli]] for every command, flag, and error code. The essentials:
 
-- Most commands are `ops <noun> <verb>`: `org`, `member`, `project`, `deliverable`, `section`, `task`, `deployment`, `comment`, `backlog`, `deadline`, `blocker`, `plan`, `step`, `notify`, `activity`, `day-label`, `favourite`, `notepad`, `day`, `query`. These have no noun: `ops login`, `ops whoami`, `ops mode`, `ops ops`, `ops call`, `ops headers`, `ops route`, `ops search`, `ops history`, `ops undo`, and `ops redo`. `ops <noun> <verb> --help` shows the arguments, the options, and examples. A noun with no verb (`ops task`) is a usage error that lists the verbs. The former words still work and are hidden: `ops subsection`, `--subsection`, `ops folder`.
+- Most commands are `ops <noun> <verb>`: `org`, `member`, `project`, `deliverable`, `section`, `task`, `deployment`, `comment`, `backlog`, `deadline`, `blocker`, `plan`, `step`, `stream`, `workspace`, `share`, `calendar`, `event`, `review`, `notify`, `activity`, `day-label`, `favourite`, `notepad`, `day`, `people`, `home`, `query`. These have no noun: `ops login`, `ops whoami`, `ops mode`, `ops ops`, `ops call`, `ops headers`, `ops route`, `ops search`, `ops history`, `ops undo`, and `ops redo`. `ops <noun> <verb> --help` shows the arguments, the options, and examples. A noun with no verb (`ops task`) is a usage error that lists the verbs. The former words still work and are hidden: `ops subsection`, `--subsection`, `ops folder`.
 - A record argument takes an ID, an address, a web URL, a title, or a path (`"Alpha › v1 › Backend"`). A title that matches more than one record fails with `<kind>_ambiguous` (exit 2) and lists the candidates with their paths. Run the command again with the ID or the address. Never guess.
-- A place of `ops task move --to` is `section:<ref>`, `project:<ref>` (its backlog), `deliverable:<ref>` (its first open section), `deployment:<ref>` (its inbox), `parent:<task>` (a subtask), `backlog`, `master`, or `unplaced`. A move takes the subtree.
+- A place of `ops task move --to` is `section:<ref>`, `project:<ref>` (its backlog), `deliverable:<ref>` (its main section: the named section of the deliverable), `deployment:<ref>` (its inbox), `parent:<task>` (a subtask), `backlog`, `master`, or `unplaced`. A move takes the subtree.
 - Every line that shows a record ends with its address, and `--json` has an `address` field. Keep it for the next command.
 - `--json` puts exactly one JSON document on stdout. Errors go to stderr as `error <code>: <message>`, then indented hints that name the next step. With `--json`, an error is one JSON document on stderr: `{"error": {code, message, exitCode, hints, ...}}`, and stdout is empty.
 - Exit codes: 0 success, 1 service refusal or other failure (a write may already have committed), 2 usage error, ambiguous reference, or guard, 3 auth, 4 network. An extra argument is a usage error: quote a text argument that has spaces. Only these inputs read stdin when you pass `-`: the body of `ops task create|update --body -`, the body of `ops comment add|edit`, a context (`ops <kind> context set <ref> -`), `ops notepad create --body -`, the text of `ops notepad append <notepad> -` and `ops notepad write <notepad> -`, and the args of `ops call <op> -`. `--body-file <path>` reads a task body from a file. Every other text argument is literal text: quote it.
@@ -241,6 +252,7 @@ These rules replace every "ask the operator" step of the interactive rules.
 7. **Read before you act on a task.** Before you change or report on one existing task, read it with `ops task context <task> --json`. It holds the description and the newest 200 comments (`--comments <n>`, up to 500), with no change events. When `commentsTruncated` is true and the older comments matter, read them with `ops call updates.timeline` and its `before` cursor.
 8. **Network errors (exit 4).** Retry a read once. Before you repeat a write, read the record or the list it would change, and check whether the write landed: a network error can come after the commit, and the CLI sends no idempotency key. Never repeat a create or a comment without that check. When you cannot tell whether a write landed, do not repeat it: report the command, the record, and the uncertain state in the result. This rule also applies to `bad_response` and response-body read failures, which can return exit 1. Check the affected records before any retry. If the result is unclear, report it and do not repeat the write.
 9. **Ambiguous references.** On `<kind>_ambiguous` (exit 2), choose the candidate only when the prompt makes the choice clear. Else report the candidates with their IDs, and do not write.
+10. **Access and moves.** Share a record, change or remove a share, move a deliverable to another project, or dismiss all notifications only when the prompt asks for it. A share gives another org or a person access to the record and the records inside it.
 
 ## Workflows in a Headless Session
 

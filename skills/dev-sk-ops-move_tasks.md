@@ -30,9 +30,9 @@ Move tasks to another place in one command, or move a whole section to another h
    |--------|-------------|
    | `section:<ref>` | That section |
    | `project:<ref>` | The backlog section of the project |
-   | `deliverable:<ref>` | The first open section of the deliverable. Ops makes one when there is none. |
+   | `deliverable:<ref>` | The main section of the deliverable (the named section, with the name of the deliverable). Ops makes it when there is none. |
    | `deployment:<ref>` | The inbox section of the deployment |
-   | `parent:<task>` | Under that task, as its last child: the tasks become subtasks, in the home of the new root |
+   | `parent:<task>` | Under that task, as its last child: the tasks become subtasks, in the home of the new root. The parent must be a root task, and a task with subtasks cannot become a subtask (`subtask_too_deep`). |
    | `backlog` | The backlog section of the project of each task (a task with no project is refused: use `master` or `project:<ref>`) |
    | `master` | The backlog section of the org (the master backlog) |
    | `unplaced` | No home |
@@ -50,7 +50,7 @@ Move tasks to another place in one command, or move a whole section to another h
    - A listed task under another listed task moves with that task. A task that is already in the destination stays.
    - A move from a backlog (any section with no deliverable) into a section of a deliverable clears the priority. Pass `--priority` to keep or set one. `--priority` is a second write for each task.
 5. **Check the output.** The JSON has `to` (`{kind, id, title, path, address}`), `moved` (each task with `id`, `title`, and `address`), and `movedIds` (every task that moved, the subtasks too). The text output has one line `moved task <id>  <title>  to <place>` for each task, and `<n> tasks moved in all (with their subtasks)` when subtasks moved too. Check that `to.path` is the place of the request.
-6. **Move a subtask inside its tree** (no other place): `ops task subtask move <task> --under <parent> [--index <n>] --json`, or `--root` to make it a root task in the home of its old root. `ops task subtask indent <task>` and `ops task subtask outdent <task>` change one level. A cycle is refused (`subtask_cycle`), and so is a tree with more than 6 levels below its root (`subtask_too_deep`).
+6. **Move a subtask inside its tree** (no other place): `ops task subtask move <task> --under <parent> [--index <n>] --json`, or `--root` to make it a root task in the home of its old root. `ops task subtask outdent <task>` makes a subtask a root task again, after its parent. Subtasks have one level (Task 409): the parent must be a root task, and a task with subtasks cannot become a subtask (`subtask_too_deep`). `ops task subtask indent` is gone. A cycle is refused (`subtask_cycle`).
 7. **Move a section with its tasks to another home.**
 
    ```bash
@@ -59,7 +59,7 @@ Move tasks to another place in one command, or move a whole section to another h
 
    - The tasks follow the section with their subtrees. The output names the new home and `movedTaskCount`.
    - The section lands at the end of the new home, or just above the first section there that depends on it.
-   - A backlog, queue, or inbox section cannot move (`section_role_locked`). An archived section cannot move (`subsection_archived`): run `ops section unarchive <section>` first, when the request allows it. A move to the same home is refused (`section_move_same_home`).
+   - A backlog, queue, or inbox section cannot move (`section_role_locked`). The named section of a project, a deliverable, or a deployment cannot move (`section_named_locked`): it goes only with its home. An archived section cannot move (`subsection_archived`): run `ops section unarchive <section>` first, when the request allows it. A move to the same home is refused (`section_move_same_home`).
 8. **Undo a wrong move** only through the guard: `ops history --on <task> --json`, confirm that the head is your `task.move` or `task.moveMany` gesture, then `ops undo --on <task> --expect <seq>`. One undo puts every task of one `tasks.moveMany` call back. A move with `--priority` also has one `tasks.update` gesture for each task: undo those first.
 
 # Output

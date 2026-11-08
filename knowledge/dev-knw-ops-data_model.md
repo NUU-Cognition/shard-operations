@@ -1,5 +1,5 @@
 ---
-description: "The NUU Operations data model — the places (org, project, deliverable, section, deployment), tasks and subtasks, the task primitive, the task map, the blockers, the hidden context, the headers, the route decision, the addresses, every field as the backend names it, the rules of each mutation, undo and Waybill, and the error codes"
+description: "The NUU Operations data model — the places (org, project, deliverable, section, deployment), tasks and subtasks, the task primitive, the task map, the blockers, the hidden context, the headers, the route decision, the addresses, Trident streams and workspaces, shares, holds, calendars and events, the named sections, every field as the backend names it, the rules of each mutation, undo and Waybill, and the error codes"
 orbh-sessions:
   - "[[3fb6e594-a179-4c0b-ba67-833b2ccaea67]]"
   - "[[4c4eadb7-6e8e-4529-8186-3bb1b5bdbc75]]"
@@ -25,17 +25,22 @@ Org (orgSlug)
   ├── Org sections ── the master backlog (role backlog), other org sections
   ├── Project
   │     ├── Project sections ── the backlog (role backlog), a queue (role queue), plain sections
-  │     ├── Deliverable ── sections ── tasks ── subtasks (at most 6 levels below the root)
+  │     ├── Deliverable ── its main section (role main, the name of the deliverable), other sections ── tasks ── subtasks (one level)
   │     └── Deployment (live, paused, retired) ── its inbox section (role inbox) ── tasks with a tag
   ├── Deployments with no project ── each with its inbox section
   ├── Unplaced tasks (no home)
   ├── Deadlines, Blockers, Plans and steps, Day labels, Notepads
+  ├── Streams (Trident) ── stream steps, substreams, drawings; Trident workspaces (one person)
+  ├── Calendars ── events (timed, all-day, periods) ── links to tasks and deadlines
+  ├── Shares (a project, a deliverable, or a task, to another org or one person)
+  ├── Holds (a lease of an actor on a task or a project)
   └── Activity (Waybill), Notifications, Comments on tasks
 ```
 
 - A **task** has one home: one section. A task with no section is **unplaced**, and that is normal.
 - A **section** has one home: a deliverable, a project, a deployment, or the org.
-- A **subtask** is a full task with a parent task. It has the home of its root task.
+- A **subtask** is a full task with a parent task. It has the home of its root task. A subtask has no subtasks (one level, Task 409).
+- Each project, deliverable, and deployment has one **named section**: a locked section with the name of its home (Task 406).
 - A **backlog** is a section with the role `backlog`. The **master backlog** is the backlog section of the org.
 - A **deployment** is something that runs. A live deployment has an **inbox**: a section with the role `inbox`.
 - A **deliverable** is done only when a person marks it done.
@@ -154,11 +159,10 @@ Table `deliverable_subsections` (the table keeps its old name, D1). Module `sect
 | `deliverableId` | `Id<"deliverables">`, optional | The home deliverable |
 | `projectId` | `Id<"projects">`, optional | The project of the home. Alone (no deliverable, no deployment): the home is the project. Index `by_project [projectId, order]`. |
 | `ownerDeploymentId` | `Id<"deployments">`, optional | The home deployment. Index `by_owner_deployment [ownerDeploymentId, order]`. |
-| `role` | `"backlog"` \| `"queue"` \| `"inbox"`, optional | A system section. Index `by_orgSlug_role`. |
+| `role` | `"backlog"` \| `"queue"` \| `"inbox"` \| `"main"`, optional | A system section. Index `by_orgSlug_role`. `main` is the named section of a deliverable (Task 406). |
 | `order` | number | The position in its home |
 | `dependsOn` | `Id<"deliverable_subsections">[]` | Upstream sections. Any section of the org. |
 | `context` | Markdown, optional | The hidden context, at most 20 000 characters (`context_too_long`) |
-| `priorityColor` | `"sun"` \| `"water"` \| `"fire"` \| `"earth"` \| `"air"` \| `"violet"`, optional | A map highlight. Six slots for each org. |
 | `completedAt` | number, optional | Server-maintained. Set when every root task is done. Cleared when a root task is not done. |
 | `archived` | boolean, optional | Hidden from the views. Still counts as done. |
 | `isCloser` | boolean, optional | Legacy: the closer of a deliverable that the migration did not reach. See § Old Words. |
@@ -183,6 +187,24 @@ Table `deliverable_subsections` (the table keeps its old name, D1). Module `sect
 | `inbox` | One in each deployment | Made when the deployment becomes live. Its default title is "Inbox". See § Deployments. |
 
 A system section (a section with a role) cannot move (`section_role_locked`). A system section with tasks cannot be deleted (`section_role_locked`). Only a deployment has an inbox, and only a project or the org has a backlog or a queue (`section_role_invalid`).
+
+**Named sections** (Task 406, `lib/sectionHome.ts`). Each project, deliverable, and deployment has one locked section with its name:
+
+| Home | Role | Title |
+|------|------|-------|
+| A project | `backlog` | The name of the project (fallback "Backlog") |
+| A deliverable | `main` | The name of the deliverable (fallback "Tasks") |
+| A deployment | `inbox` | The name of the deployment (fallback "Inbox") |
+
+1. The create of the home makes its named section (`projects.create`, `deliverables.create`, and the inbox of a live deployment).
+2. The title follows the home: a rename of the home renames the section. Each ensure writes the title again.
+3. A named section cannot be renamed, deleted, archived, moved, or made into a task: `section_named_locked` ("This section has the name of its <home>. You cannot <change> it."). It goes only with its home.
+4. A task or a move that names only the home lands in its named section.
+5. The main section of a deliverable is done with its deliverable, not with its tasks.
+6. A deliverable of before Task 406 promotes its first open plain section to `main` at its first ensure. The migration `named-sections-406` makes the named sections of before.
+7. The master backlog (the backlog of the org) is not a named section: its title stays "Backlog".
+
+**No priority** (Task 413). A section has no priority. `subsections.setPriority`, the field `priorityColor`, and `ops section priority` are gone. The priority of a task stays (§ Tasks).
 
 **Derived status** (`lib/dagStatus.ts`), in this order:
 
@@ -235,7 +257,7 @@ A system section (a section with a role) cannot move (`section_role_locked`). A 
 | `subsection_conversion_has_tasks` | Move or delete every task |
 | `subsection_conversion_has_dependencies` | Empty its `dependsOn` |
 | `subsection_conversion_has_dependents` | Remove it from every `dependsOn` |
-| `subsection_conversion_has_metadata` | Clear `deploymentId`, `priorityColor`, and `completedAt` |
+| `subsection_conversion_has_metadata` | Clear `deploymentId` and `completedAt` (a section has no priority since Task 413) |
 | `subsection_conversion_held_by_strike` | Remove it from Strike |
 | `subsection_conversion_destination_invalid` | Choose another section in the same deliverable |
 
@@ -269,12 +291,22 @@ Table `deliverables`. Module `deliverables`.
 | `deliverables.setDeployment` | `orgSlug, deliverableId, deploymentId?\|null, fromDeploymentId?\|null` |
 | `deliverables.setFlintPlace` | `orgSlug, deliverableId, address\|null, flintId?\|null` ((Task) 317; `flint_place_invalid`) |
 | `deliverables.remove` | `orgSlug, deliverableId` |
+| `deliverables.move` | `orgSlug, deliverableId, projectId, gestureId?` → `{projectId, address, movedSectionCount, movedTaskCount, clearedDeploymentLinks, unlinkedNodeCount}` (Task 408) |
 
-**Create** (D3). `deliverables.create` makes no section and no task. A `dueDate` makes a deadline linked to the deliverable. Add the sections next: `sections.create` with `home: {kind: "deliverable", id}`. `ops deliverable create --section <title>` makes the first section in the same command.
+**Create** (D3, Task 406). `deliverables.create` makes the main section of the deliverable (role `main`, with its name) and no task. A `dueDate` makes a deadline linked to the deliverable. Add the sections next: `sections.create` with `home: {kind: "deliverable", id}`. `ops deliverable create --section <title>` makes the first section in the same command.
 
 **Done** (D3). A deliverable is done only when a person marks it done: `deliverables.setDone({done: true})` sets `completedAt` and `completedBy`. `done: false` clears both. The label is `deliverable.done` or `deliverable.reopen`, in the scope `project:<projectId>`. A legacy closer of the deliverable becomes a plain section first. The sections do not decide: a deliverable with every section done stays open until a person marks it done.
 
 **Derived deliverable status** (`lib/dagStatus.ts`, `deliverableStatus.ts`): `completed` when `completedAt` is set; else `blocked` when every section is blocked; else `in-progress` when a section is in progress; else `open`.
+
+**Move** (Task 408). `deliverables.move` moves a deliverable to another project of the org, with each of its sections (the main section too) and each of its tasks and subtasks. Only a member of the org moves it (no share path).
+
+1. The name moves into the new project. When the name is taken there, Ops adds a suffix. The old address row becomes `moved`, so the old alias still finds the deliverable.
+2. A link to a deployment of another project (`deploymentId`, `fromDeploymentId` of the deliverable, `deploymentId` of a section) is cleared.
+3. Each node of the project tree of the old project that links the deliverable, one of its sections, or one of its tasks loses the link.
+4. The id, the deadlines, the dependencies, the Flint place, and the done state stay.
+5. The label is `deliverable.move`, in the scope `project:<old project>`. An undo replays the name move too.
+6. Codes: `deliverable_not_found`, `project_not_found`, `deliverable_move_same_project`.
 
 **`deliverables.remove` cascades.** It deletes every section and every task of the deliverable, and removes those sections from the `dependsOn` of sections in other homes.
 
@@ -337,7 +369,7 @@ Placement errors: `task_folder_in_subsection`, `task_subsection_required`, `task
 | `unplaced: true` | No home |
 | None of these | The backlog section of the org (the master backlog) |
 
-`ops task create --deliverable <ref>` puts the task in the first open section of the deliverable, and `--deployment <ref>` in the inbox of a live deployment. The CLI finds the section from the headers.
+`ops task create --deliverable <ref>` puts the task in the main section of the deliverable (§ Sections, Named sections), and `--deployment <ref>` in the inbox of a live deployment. The CLI finds the section from the headers.
 
 **Move** (`tasks.move`, `tasks.moveMany`). The target `to` is one of:
 
@@ -345,7 +377,7 @@ Placement errors: `task_folder_in_subsection`, `task_subsection_required`, `task
 |------|-------------|
 | `{sectionId}` | That section |
 | `{projectId}` | The backlog section of the project |
-| `{deliverableId}` | The first open section of the deliverable. The backend makes one when there is none. |
+| `{deliverableId}` | The main section of the deliverable (role `main`, Task 406). The backend makes it when there is none (`ensureMainSection`). |
 | `{deploymentId}` | The inbox section of the deployment |
 | `{parentTaskId}` | Under that task, as its last child (§ Subtasks) |
 | `{unplaced: true}` | No home |
@@ -390,7 +422,7 @@ Module `subtasks` (D5). A subtask is a full task with a parent task (`parentTask
 
 - A subtask has the home of its root task. Access, search, and addresses work as for its root.
 - A move of a task moves its subtree. A subtask is in no Strike unit (Strike keeps its own tree).
-- A task can have at most 6 levels of subtasks below its root (`MAX_SUBTASK_DEPTH = 6` in `lib/taskTree.ts`: the most parents above a task). A deeper tree is refused (`subtask_too_deep`).
+- **One level** (Task 409). A subtask has no subtasks (`MAX_SUBTASK_DEPTH = 1` in `lib/taskTree.ts`; it was 6). A create, a move, or a reparent under a subtask is refused, and so is a task with subtasks that would become a subtask: `subtask_too_deep` ("A subtask cannot have subtasks, and a task with subtasks cannot become a subtask."). The migration `flat-subtasks-409` moved each deeper subtask under its root task, in outline order.
 - A parent in the subtree of the task is refused (`subtask_cycle`).
 - `order` orders the children of one parent.
 - A list of a section shows only root tasks, each with `subtaskCount` and `subtaskDone`.
@@ -399,12 +431,14 @@ Module `subtasks` (D5). A subtask is a full task with a parent task (`parentTask
 | Op | Args | Notes |
 |----|------|-------|
 | `subtasks.create` | `orgSlug, parentTaskId, title, body?, afterTaskId?` | After the sibling `afterTaskId`, else the last child. Returns its ID. `subtask_title_empty`, `subtask_title_too_long`. |
+| `subtasks.children` (query) | `orgSlug, taskId` | The subtasks as full task rows, in order, at most 200. A share viewer gets only the rows that it can read, with the share fields. |
 | `subtasks.tree` | `orgSlug, taskId` | `{task: node, total, done, cut?}`. Each node has `taskId, title, checkbox, depth, address, children`. At most 200 nodes (`SUBTASK_TREE_MAX`); `cut` says that the tree is longer. |
-| `subtasks.counts` | `orgSlug, taskIds` | `{total, done}` for each of at most 100 tasks |
+| `subtasks.counts` (query) | `orgSlug, taskIds` | `{<taskId>: {total, done}}` for each of at most 100 tasks; an id that you cannot read is dropped |
 | `subtasks.reparent` | `orgSlug, taskId, parentTaskId\|null, index?` | Under another parent, or `null`: a root task again, in the home of its old root |
 | `subtasks.reorder` | `orgSlug, taskId, index` | The place among its siblings (0 is first) |
-| `subtasks.indent` | `orgSlug, taskId` | A child of the sibling above it (`subtask_no_previous`) |
-| `subtasks.outdent` | `orgSlug, taskId` | One level up, after its parent (`subtask_not_a_subtask`) |
+| `subtasks.outdent` | `orgSlug, taskId` | A subtask becomes a root task, after its parent (`subtask_not_a_subtask`) |
+
+`subtasks.indent` stays on the server, but it is not on the agent gateway, in the CLI, or in the web app: an indent under a subtask is `subtask_too_deep`. Use `subtasks.reparent` (`ops task subtask move <task> --under <root task>`).
 
 `tasks.move` with `{parentTaskId}` also makes a task a subtask, with its subtree.
 
@@ -468,7 +502,7 @@ Module `taskMap`. `taskMap.get({orgSlug, taskId})` gives everything around one t
 
 - `home` is the path of the home: org › project › deliverable › section, or the inbox section of a deployment. `unplaced: true` means no home.
 - The lineage, the groups, and the relations come from `taskDetail` (`lib/taskPrimitive.ts`).
-- The bounds: at most 200 tasks in the subtree (`subtreeCut`), at most 50 members for each group (`membersCut`), and a byte budget for the links (`linksCut`). The walk to the root stops at 6 levels.
+- The bounds: at most 200 tasks in the subtree (`subtreeCut`), at most 50 members for each group (`membersCut`), and a byte budget for the links (`linksCut`). A subtask has one parent, and the parent is the root.
 - The web page of the map is `/<org>/tasks/<taskId>/map`. The CLI is `ops task map <task>`.
 
 ## Backlogs
@@ -573,7 +607,7 @@ The answer:
 1. **The text match.** Each open list of the org is a document: a section, the backlog of a project, the inbox of a deployment, a deliverable with no section. A document has its title, the titles above it, its hidden context, and the titles of its recent open tasks. A word of the text scores where it matches (title > context > task titles > parent titles). A rare word scores more. A title that the text names gets a bonus. The answer has at most 8 places.
 2. **Jev.** With `smart` (the default) and a key, one call to the model `typesafe/jev-1.13` through the OpenRouter Decisions API (`lib/jev.ts`, the server env value `OPENROUTER_API_KEY`). It picks the place, the project, and the intent. A failure or a time-out (1.5 s) keeps the text match, with `model: "text"`. It is never an error for the person.
 
-- A place of the kind `deliverable` means its first open section. A place of the kind `project` means its backlog section. A place of the kind `deployment` means its inbox.
+- A place of the kind `deliverable` means its main section. A place of the kind `project` means its backlog section. A place of the kind `deployment` means its inbox.
 - "Smart suggestions" is a setting of the person (on by default). Off means no Jev call: the text match only. `ops route --no-smart` does the same.
 - No candidate: the CLI puts the task in the master backlog.
 
@@ -935,6 +969,92 @@ The step gestures of `plans.*` for a plan step and a stream step:
 | `plans.setStepState` | `orgSlug, nodeIds, state: "planned" \| "active" \| "done", positions?, shift?, shore?, boxes?` | `node_done_linked`, `node_record_done`, `node_gated` |
 | `plans.doneAndNext` | `orgSlug, nodeId, title?, assigneeUserId?, positions?, shift?, boxes?, boardPosition?` | The step is done, and a new active step comes after it. `node_not_doing` when the step is not in progress. |
 | `plans.setBoardPositions` | `orgSlug, positions: [{nodeId, x, y}], boxes?` | Each place is clamped into the zone of its step. |
+
+## Shares
+
+Table `shares`. Module `shares`. A share gives one **subject** a permission on one record of your org: another org (`subjectOrg`) or one person (`subjectPerson`), never both.
+
+- **Records:** a `project`, a `deliverable`, or a `task`. A share reaches the records inside the record. A section or a notepad is not shared alone.
+- **Permission:** `reader` or `editor`. Ops never shares `admin`.
+- **Who shares:** an owner or an admin of the org, or the owner of a personal workspace. The creator of a record does not get this right.
+- **One share for each subject.** A second share to the same subject changes the share of before.
+- **Notices.** A new share, and a change from `reader` to `editor`, notify the subject. An unshare sends nothing.
+- **No undo.** A share is not journaled. A frozen org refuses each write (`org_frozen`).
+
+| Op | Args | Notes |
+|----|------|-------|
+| `shares.forEntity` (query) | `entityType, entityId` | The access of the record: `{entityTitle, summary, lines, canManage, orgOptions, …}`, or `null` (no record, or no access) |
+| `shares.viewerAccess` (query) | `entityType, entityId` | `{via: "member" \| "share", level, canManage}`, or `null` |
+| `shares.sharedWith` (query) | `orgSlug` | The records shared with that workspace: `[{shareId, entityType, entityId, title, ownerName, permission, sharedAt, href}]`, newest first, at most 200 |
+| `shares.share` | `entityType, entityId, subject: {kind: "org", slug} \| {kind: "person", id}, permission` | `{shareId, created, changed, permission}` |
+| `shares.setPermission` | `shareId, permission` | The same shape. `changed: false` when the permission does not change. |
+| `shares.unshare` | `shareId` | Deletes the share |
+
+Codes (the words of the access layer): `same-org` (a share to the org of the record), `personal-target` (a share to a personal workspace), `org-unknown`, `self-target`, `person-unknown` (the person is not active), `not-reachable` (no such record or share, or a bad id), `view-only`, `owner-only`, `org_frozen`.
+
+## Holds
+
+Table `entity_holds` (the log: `entity_hold_log`). Module `holds`. A hold is a lease of an **actor** on a task or a project. The actor is the v1 address of the caller (for example an Orbh session), and it acts for one person.
+
+- **Kinds:** `take` (one actor writes) and `chair` (one actor writes, and it can share the write with other actors).
+- **The lease:** 600 s by default, from 60 s to 3600 s. A hold whose `expiresAt` has passed is no hold: a sweep each minute deletes it and logs `expire`.
+- **The rule:** while a record is held, a write through a NUU Connect tool by another actor is refused with `held`. A read, and a write in the web app, is never refused. The holder is the same actor address and the same person.
+- **Requests:** another actor can ask the holder for the hold (at most 20 requests, a note of at most 500 characters). The holder shares, hands over, or refuses.
+- **No undo.** Each event (`take`, `chair`, `return`, `renew`, `expire`, `request`, `answer`) is a log row and a Waybill fact.
+- **Take and return:** the NUU Connect endpoint `POST /connect/v1/hold` (Orbh: `flint orbh objects take|chair|return`). The agent gateway reads holds only.
+
+| Op | Args | Notes |
+|----|------|-------|
+| `holds.ofTask` (query) | `orgSlug, taskId` | `{kind: "take" \| "chair", holder, since, expiresAt, requests}` (`requests` is a count), or `null`. It gives the row as stored: compare `expiresAt` with the time now. A member or a share viewer can read it. |
+
+Codes of a hold: `held`, `not-holder`, `no-hold`, `bad-request`, `not-supported`.
+
+## Calendars and Events
+
+Module `calendar`. Tables `calendars`, `calendar_defaults`, `calendar_events`, `calendar_event_links`.
+
+**Calendars.** A calendar has a `name` (at most 80 characters) and a `color` (`water`, `fire`, `earth`, `air`, `sun`, `moon`, `muted`). It belongs to the workspace where it was made (personal or an org), at most 50 for each workspace (`calendar_too_many`). The **default calendar** is personal: each person picks one (`calendar_defaults`), else the oldest calendar is the default. The first event of a workspace makes the calendar "Events" (`water`) when there is none. A delete of a calendar deletes its events (`calendar_too_many_events` above 500 events).
+
+**Events.** An event has a `title` (at most 200 characters), `description` (the notes), `location` (the place), `meetingUrl` (the link, http or https), and `color?` (no color: the color of the calendar). Its timing has one of two forms:
+
+| Form | Fields | Bound |
+|------|--------|-------|
+| Timed | `allDay: false, startMs, endMs, tz` (an IANA zone) | at most 31 days |
+| All day | `allDay: true, startDate, endDate` (`YYYY-MM-DD`, both days in) | at most 731 days |
+
+A **period** is an all-day event of more than one day (`ops event create --date <first day> --until <last day>`). The people of an event are members of the org (`attendees`, at most 100); there are no invites. **Guests** are people outside NUU, with a name and an email (at most 100); they get no access.
+
+**Repeat.** `repeat: {freq: daily | weekly | monthly | yearly, interval, weekdays?, monthBy?: day | weekday, count?, until?}`; `count` and `until` cannot both be set. One occurrence is named by its `key` (its local date). An edit or a delete takes `scope`: `this` (an override row, or a skipped day), `following` (the series ends before the day, and a new series starts at it), or `all` (the default). A change that moves the days of the occurrences drops the overrides of the part that it changes. A change of `repeat` with `this` on an override is refused (`event_repeat_scope`).
+
+**Links.** An event links tasks and deadlines (`calendar_event_links`, at most 50). The links of a series belong to its first row.
+
+| Op | Args | Notes |
+|----|------|-------|
+| `calendar.listCalendars` (query) | `orgSlug` | Each calendar with `isDefault` |
+| `calendar.createCalendar` | `orgSlug, name, color` | The calendar ID |
+| `calendar.updateCalendar` | `orgSlug, calendarId, name?, color?` | |
+| `calendar.removeCalendar` | `orgSlug, calendarId` | Deletes its events; resets the default of each person who picked it |
+| `calendar.setDefaultCalendar` | `orgSlug, calendarId` | Your default calendar. Needs org access only. |
+| `calendar.listEvents` (query) | `orgSlug, from, to, tz` | A window of 1 to 100 days: `{events, truncated}` |
+| `calendar.getEvent` (query) | `orgSlug, eventId` | `{event, rootId, repeat, links}`, or `null` |
+| `calendar.createEvent` | `orgSlug, calendarId?, title, timing, repeat?, description?, location?, meetingUrl?, color?, attendees?, guests?, links?` | The event ID. No `calendarId`: your default calendar. |
+| `calendar.updateEvent` | `orgSlug, eventId, key?, scope?, …fields` | `null` clears a field. Gives the ID of the row that holds the change. |
+| `calendar.removeEvent` | `orgSlug, eventId, key?, scope?` | |
+| `calendar.attach`, `calendar.detach` | `orgSlug, eventId, link: {kind: "task" \| "deadline", id}` | |
+| `calendar.eventsForRecord` (query) | `orgSlug, link: {kind: "task" \| "deadline", id}` | The events of a record, soonest first |
+
+Codes: `calendar_name_empty`, `calendar_name_too_long`, `calendar_not_found`, `calendar_too_many`, `calendar_too_many_events`, `event_not_found`, `event_invalid_date`, `event_invalid_range`, `event_invalid_time`, `event_invalid_zone`, `event_invalid_window`, `event_range_too_long`, `event_invalid_repeat`, `event_invalid_key`, `event_repeat_scope`, `event_title_empty`, `event_text_too_long`, `event_invalid_url`, `event_too_many_attendees`, `event_guest_name_empty`, `event_guest_name_too_long`, `event_guest_invalid_email`, `event_too_many_guests`, `event_link_not_found`, `event_too_many_links`, `user_not_found`.
+
+## Other Ops of ops-overnight-1109
+
+| Op | Args | Notes |
+|----|------|-------|
+| `notifications.markReadByKeyPrefix` | `prefix` | Marks as read each unread notification of the caller whose collapse key starts with the prefix. An empty prefix does nothing. |
+| `notifications.dismissAll` | `tenant?` | Deletes each notification of the caller ("Clear all"); no `tenant`: every tenant |
+| `updates.count` (query) | `target: {type, id, tenant?}` | The number of comments on a task; `0` for a target that is not a task |
+| `updates.people` (query) | `orgSlug` | The people that you can mention: `[{id: "user:<clerkUserId>", userId, name, handle?, imageUrl?}]`, by name |
+| `addresses.rename` | `uri, name\|null` | Adds, changes, or removes the alias of a project, a deliverable, a task, a notepad, or a task group. Needs owner rights (the creator counts). A deliverable is renamed inside its project, and its name cannot be removed. The refusal comes back as a value: `{ok: false, refusal}` with `name-required`, `name-taken` (with a suggestion), `name-invalid`, `name-like-id`, `name-reserved`, `bad-parent`, `not-reachable`, `owner-only`, or `view-only`. |
+| `tasks.listUnplacedRoots` (query) | `orgSlug, includeDone?` | The root tasks with no home, with `subtaskCount` and `subtaskDone`, in order (at most 1000 rows read) |
 
 ## Comments
 
@@ -1313,9 +1433,11 @@ The gateway returns `{ok: false, error: {code, message, data?}}`. The codes belo
 | `deployment_not_owned`, `deployment_project_mismatch` | The deployment cannot take this link | Choose another deployment |
 | `task_folder_in_subsection`, `task_subsection_required`, `task_deliverable_required`, `task_project_required`, `deliverable_project_mismatch`, `task_project_mismatch`, `task_unplaced_with_home` | Bad task home | See Tasks § The home |
 | `task_has_subtasks` | A delete of a task with subtasks | Pass `withSubtasks: true` (`ops task delete --with-subtasks`), or move the subtasks first |
-| `subtask_too_deep` | The tree would have more than 6 levels below its root | Put the task under a higher parent |
+| `subtask_too_deep` | A subtask under a subtask, or a task with subtasks under a parent (one level, Task 409) | Put the task under a root task, or make it a root task |
+| `section_named_locked` | A rename, delete, archive, move, or conversion of the named section of a project, a deliverable, or a deployment (Task 406) | Change the home: the section follows it |
+| `deliverable_move_same_project` | `deliverables.move` to the project that the deliverable is in | Name another project |
 | `subtask_cycle` | The new parent is in the subtree of the task | Choose a parent outside the subtree |
-| `subtask_no_previous`, `subtask_not_a_subtask` | An indent with no sibling above, or an outdent of a root task | Use `subtasks.reparent` |
+| `subtask_not_a_subtask` | An outdent of a root task | The task is a root task already |
 | `subtask_title_empty`, `subtask_title_too_long`, `task_title_required` | A bad title | Give a title |
 | `move_too_large` | A move of more than 200 tasks | Move them in parts |
 | `task_text_conflict` | `expectedTitle` or `expectedBody` is stale | Read the task again |
