@@ -785,6 +785,7 @@ is in `project:<projectId>`.
 | `ops favourite list` — your favourites in the active org, in star order (`home.favourites`) | `ops favourite list --json` |
 | `ops favourite add <record> [--kind project\|deliverable\|section]` — star a record; a title needs `--kind`, an ID or URL does not | `ops favourite add <deliverableId>` |
 | `ops favourite remove <record> [--kind]` — remove the star; the ID of a deleted record works too | `ops favourite remove <recordId>` |
+| `ops favourite reorder <records...>` — `home.reorderFavourites`: the order of the Pinned favourites; the given record IDs (from `ops favourite list`) come first, in the given order, then the others | `ops favourite reorder <recordA> <recordB>` |
 
 A record of another kind gives `wrong_kind`. Both ops are idempotent. More
 than 100 favourites in one org gives `favourites_full`. The ops come from
@@ -815,7 +816,7 @@ text: only the ID counts.
 | `ops notepad show <notepad> [--md]` — the title, the facts (with the `rev`), then the Markdown; `--md` prints only the Markdown; `--json`: `{notepad, blocks, tasks, markdown}` | `ops notepad show "Standup notes" --md > notes.md` |
 | `ops notepad create <title> [--general] [--body <md\|->] [--section <s>]` — personal unless `--general` | `ops notepad create "Sprint notes" --general --section Backend` |
 | `ops notepad rename <notepad> <title>` | `ops notepad rename <notepadId> "Weekly standup"` |
-| `ops notepad section <notepad> (<section> \| --clear)` — `notepads.setSection`: link to one section, or remove the link; `ops notepad scope` is its other name | `ops notepad scope <notepadId> Backend` |
+| `ops notepad section <notepad> (<section> \| --clear)` — `notepads.setSection`: link to one section, or remove the link; `ops notepad scope` is a hidden alias | `ops notepad scope <notepadId> Backend` |
 | `ops notepad append <notepad> [<md\|->] [--task <task>]` — add Markdown at the end, or a task mention with `--task` | `ops notepad append <notepadId> "- Call Sam about the beta"` |
 | `ops notepad write <notepad> <md\|-> (--expected-rev <rev> \| --force)` — replace all content; a change after `rev` refuses the write; `--force` replaces the content that is there now (a change after your read is lost) | `ops notepad write <notepadId> - --expected-rev 3 < notes.md` |
 | `ops notepad to-task <notepad> <text> [--section <s> \| --project <p> \| --backlog] [--title <t>] [--keep]` — make a task from a text; a task chip replaces the text (`--keep`: the chip follows it); with no destination flag, the task goes to the section of the notepad; a notepad with no scope needs a flag | `ops notepad to-task <notepadId> "Call Sam about the beta" --backlog` |
