@@ -375,7 +375,7 @@ A section has no priority (Task 413): `ops section priority` is gone.
 | `ops task show <task>` — also the address, the parent, the people looped in (a `looped in` line with each name and users ID; `--json`: `loopedIn: [{userId, name}]`, `name` is `null` for a person who is not a member; an empty list when no person is looped in), the subtasks (the tree with the done count; `--json`: `subtasks`), the lineage, the task groups, the related links, and the attachments; when the incoming lineage stops at its byte budget, `--json` has `linksCut: true` and the text says so; a task with a Flint task note gives the lines `note` (the label, else the address) and `note link` (the open link), and `--json` has `note`, `noteLabel`, and `noteUrl` at the top (each `null` when the task has no note); the open review requests (the reviewer, the requester, the age, and the note; `--json`: `reviews: {open, closed}`, from `reviews.forTask`; a deployment without the op gives no `reviews`) | `ops task show @v1/test/task/<id>#ops` |
 | `ops task context <task> [--comments <n>]` — the full context of a task for an agent: the description, the place, the people, and the comments (no change events); `--comments` keeps the newest n (1 to 500, default 200). Read it before you work on a task | `ops task context <taskId> --comments 20 --json` |
 | `ops task search <query> [--limit 1-100]` | `ops task search docs --limit 5` |
-| `ops task create <title> [--section <s> \| --project <p> \| --deliverable <d> \| --deployment <d> \| --parent <task> \| --route [text] \| --master \| --unplaced] [--tag feedback\|hotfix\|ongoing\|recurring] [--every day\|week\|month] [--repo <name>] [--note <address> [--note-label <text>]] [--body <md\|-> \| --body-file <path>] [--priority low\|medium\|high\|urgent] [--assign <me\|member>] [--top]` — default: the master backlog, at the end; `--project` is its backlog section, `--deliverable` its first open section, `--deployment` its inbox, `--parent` a subtask; `--route` asks `route.suggest` with the text (default: the title) and prints the place, the score, and the reason; `--repo` adds a `repo` related link (`taskRelations.add`); the output gives the stored title (a trailing digit of the title is the rarity: "Fix login 1" is stored as "Fix login"), the address, and the section | `ops task create "Login fails on Safari" --deployment Production --tag hotfix` |
+| `ops task create <title> [--section <s> \| --project <p> \| --deliverable <d> \| --deployment <d> \| --parent <task> \| --route [text] \| --master \| --unplaced] [--tag feedback\|hotfix\|ongoing\|recurring] [--every day\|week\|month] [--repo <name>] [--note <address> [--note-label <text>]] [--body <md\|-> \| --body-file <path>] [--priority low\|medium\|high\|urgent] [--assign <me\|member>] [--top]` — default: the master backlog, at the end; `--project` is its backlog section, `--deliverable` its main section (the named section of the deliverable; the service makes it when there is none), `--deployment` its inbox, `--parent` a subtask; `--route` asks `route.suggest` with the text (default: the title) and prints the place, the score, and the reason; `--repo` adds a `repo` related link (`taskRelations.add`); the output gives the stored title (a trailing digit of the title is the rarity: "Fix login 1" is stored as "Fix login"), the address, and the section | `ops task create "Login fails on Safari" --deployment Production --tag hotfix` |
 | `ops task update <task> [--title] [--body <md\|-> \| --body-file <path>] [--priority <p\|none>] [--assign <member\|none>] [--rarity <1-7\|none>] [--tag <tag\|none>] [--every day\|week\|month\|none]` — `--tag` and `--every` need `tasks.update` with `tag` and `recurrence` (MODEL; a deployment without them refuses with `agent_invalid_input`) | `ops task update "Write docs" --body-file notes.md` |
 | `ops task start <task>` — doing | `ops task start "Write docs"` |
 | `ops task done <task>` — the same as `close` with no result | `ops task done "Write docs"` |
@@ -644,7 +644,10 @@ for any other scope (below).
 
 ### step
 
-Steps take an ID or URL alone, or a title or short ID with `--plan <plan>` (a plan step) or `--stream <stream>` (a stream step of Trident). Each `ops step` verb takes a stream step too: `update`, `assign`, `requires`, `links`, and `delete` act on the steps of a lane as on the steps of a plan.
+Steps take an ID or URL alone, or a title or short ID with `--plan <plan>` (a plan step) or `--stream <stream>` (a stream step of Trident).
+
+- **These verbs take a plan step and a stream step:** `update`, `assign`, `requires set|add|remove`, `links set|add|remove` (a stream step has at most one link: `node_link_single`), `delete`, `split`, `split-beside`, `state`, `done-next`, `move-links`, `remove-links`, and `place`.
+- **These verbs take a plan only:** `ops step add <plan> <title>` (for a stream step: `ops stream step add <stream> <title>`), and `ops step move` (the plan canvas; a stream step refuses with `node_not_in_plan`: place it with `ops step place <step> --x <x> --y <y>`).
 
 | Command | Example |
 |---|---|
@@ -681,7 +684,7 @@ fallback layout that the CLI does not compute).
 Trident is the stream view of Ops (ops-overnight-1109). A **stream** is a
 lane of work: a titled lane with a state (`active`, `paused`, `done`), the
 places that it serves (its attachments), and its **steps**. A stream step
-is a plan step of the lane: the `ops step` verbs take it too (below). Each
+is a plan step of the lane. Make it with `ops stream step add`; most `ops step` verbs take it too, but not `ops step add` and `ops step move` (see [step](#step)). Each
 step is in one **zone**: `planned` (above the now line), `active` (on the
 now line), or `done` (under it). The **shore** is a part of the planned zone:
 the goals of the lane, above the planned steps (only a `todo` step goes
@@ -716,7 +719,9 @@ a short ID needs `--stream <stream>`. A `<substream>` is an ID; a title needs
 | `ops stream step move <steps...> --to <stream> [--stream <stream>]` — to another lane | `ops stream step move <a> <b> --to "Next lane"` |
 | `ops stream step park\|unpark <steps...> [--stream <stream>]` | `ops stream step park <stepId>` |
 | `ops stream step shore\|unshore <steps...> [--stream <stream>]` | `ops stream step unshore <stepId>` |
-| `ops stream step cross set\|add\|remove <step> [steps...] [--stream <stream>]` — the cross links to steps of other streams; they gate nothing | `ops stream step cross add <a> <b>` |
+| `ops stream step cross set <step> [steps...] [--stream <stream>]` — replace the cross links of the step (no steps: none); cross links point to the steps of other streams and gate nothing | `ops stream step cross set <a> <b> <c>` |
+| `ops stream step cross add <step> <steps...> [--stream <stream>]` | `ops stream step cross add <a> <b>` |
+| `ops stream step cross remove <step> <steps...> [--stream <stream>]` | `ops stream step cross remove <a> <b>` |
 | `ops stream step substream <steps...> --to <substream\|none> [--stream <stream>]` — put steps in a substream, or take them out | `ops stream step substream <a> <b> --to <substreamId>` |
 | `ops stream substream create <stream> <title> [--step <step>]... [--box <x,y,width,height>]` | `ops stream substream create "Launch lane" "Copy" --step <a>` |
 | `ops stream substream rename <substream> <title> [--stream <stream>]` | `ops stream substream rename <substreamId> "Copy and art"` |
@@ -740,7 +745,9 @@ that one person shows together. It is personal.
 | `ops workspace show <workspace>` | `ops workspace show "Launch week"` |
 | `ops workspace create [title] [--stream <stream>]...` | `ops workspace create "Launch week" --stream "Launch lane"` |
 | `ops workspace update <workspace> --title <t>` | `ops workspace update "Launch week" --title "Launch"` |
-| `ops workspace streams set\|add\|remove <workspace> [streams...]` | `ops workspace streams add "Launch" "Next lane"` |
+| `ops workspace streams set <workspace> [streams...]` — replace the streams of the workspace, in this order (no streams: none) | `ops workspace streams set "Launch" "Launch lane" "Next lane"` |
+| `ops workspace streams add <workspace> <streams...>` | `ops workspace streams add "Launch" "Next lane"` |
+| `ops workspace streams remove <workspace> <streams...>` | `ops workspace streams remove "Launch" "Next lane"` |
 | `ops workspace reorder <workspaces...>` — the new order of your workspaces | `ops workspace reorder Launch Backlog` |
 | `ops workspace delete <workspace>` — the streams stay; the last workspace cannot be deleted (`workspace_last`) | `ops workspace delete "Launch"` |
 
@@ -924,7 +931,7 @@ in [[dev-knw-ops-data_model]] § Calendars and Events.
 | `ops event list [--from <day>] [--to <day> \| --days <n>] [--calendar <calendar>] [--tz <zone>]` — the occurrences in a window (each repeat expanded); `--from` default today; `--to` is not in the window; `--days` 1 to 100, default 7 | `ops event list --from today --days 7` |
 | `ops event show <event>` | `ops event show <eventId>` |
 | `ops event create <title> (--start <datetime> (--end <datetime> \| --duration <length>) [--tz <zone>] \| --date <day> [--until <day>]) [--calendar <calendar>] [--repeat daily\|weekly\|monthly\|yearly [--every <n>] [--weekdays mon,wed,fri] [--month-by day\|weekday] [--count <n> \| --repeat-until <day>]] [--notes <text>] [--place <text>] [--link <url>] [--color <tone>] [--person <member>]... [--guest "Name <email>"]... [--attach task:<ref>\|deadline:<ref>]...` — `--start` is `YYYY-MM-DDTHH:mm` in `--tz` (default: the zone of the machine), `"tomorrow 09:00"`, or an ISO time with an offset; `--duration` is `30m`, `1h`, `1h30m`; `--date` is `YYYY-MM-DD`, `today`, `tomorrow`, or `+3d`; `--until` is the last day, in the event; you are always on the event | `ops event create "Standup" --start 2026-11-10T09:00 --end 2026-11-10T09:15 --tz Australia/Sydney --repeat weekly --weekdays mon,wed,fri` |
-| `ops event update <event> [--title <t>] [the fields of create] [--calendar <calendar>] [--no-guests] [--occurrence <day>] [--scope this\|following\|all]` — only the given fields change; `--calendar` moves the event; `--repeat none` stops a repeat; `none` clears `--notes`, `--place`, and `--link`; `--person` and `--guest` replace the list; for a series, `--occurrence` names one day (its local date), and `--scope` says which occurrences change (default `all`) | `ops event update <eventId> --occurrence 2026-11-18 --scope this --start "2026-11-18 10:00" --end "2026-11-18 11:00"` |
+| `ops event update <event> [--title <t>] [--start <datetime>] [--end <datetime> \| --duration <length>] [--tz <zone>] [--date <day>] [--until <day>] [--calendar <calendar>] [--repeat daily\|weekly\|monthly\|yearly\|none] [--every <n>] [--weekdays <days>] [--month-by day\|weekday] [--count <n>] [--repeat-until <day>] [--notes <text\|none>] [--place <text\|none>] [--link <url\|none>] [--color <tone>] [--person <member>]... [--guest "Name <email>"]... [--no-guests] [--occurrence <day>] [--scope this\|following\|all]` — only the given fields change; `--calendar` moves the event; `--repeat none` stops a repeat; `none` clears `--notes`, `--place`, and `--link`; `--person` and `--guest` replace the list; for a series, `--occurrence` names one day (its local date), and `--scope` says which occurrences change (default `all`). `update` has no `--attach`: use `ops event attach <event> task:<ref>\|deadline:<ref>` | `ops event update <eventId> --occurrence 2026-11-18 --scope this --start 2026-11-18T10:00 --end 2026-11-18T11:00` |
 | `ops event delete <event> [--occurrence <day>] [--scope this\|following\|all]` — default `all`: the whole series | `ops event delete <eventId> --occurrence 2026-11-18 --scope following` |
 | `ops event attach\|detach <event> task:<ref>\|deadline:<ref>` — of a series: on each occurrence | `ops event attach <eventId> task:<taskId>` |
 | `ops event for task:<ref>\|deadline:<ref>` — `calendar.eventsForRecord`: the events of a record | `ops event for task:<taskId>` |

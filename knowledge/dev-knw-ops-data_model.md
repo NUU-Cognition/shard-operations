@@ -236,15 +236,15 @@ A system section (a section with a role) cannot move (`section_role_locked`). A 
 | `sections.ensureBacklog` | `orgSlug, projectId?` | The ID of the backlog section of the project (or of the org with no project). Makes it when absent. |
 | `subsections.update` | `orgSlug, subsectionId, title?, dueDate?, order?` | `dueDate` writes to the linked deadline (`""` detaches it). **`order` moves the section and silently removes dependencies that no longer point up.** |
 | `subsections.setDependencies` | `orgSlug, subsectionId, dependsOn` | Replaces the whole list |
-| `subsections.setPriority` | `orgSlug, subsectionId, isPriority` | Takes the first free colour in the order `sun, water, fire, earth, air, violet`. All six taken: error "Maximum of 6 priorities reached". |
 | `subsections.convertToTask` | `orgSlug, subsectionId, destinationSubsectionId?` | See below |
 | `subsections.create`, `listByDeliverable`, `listByOrg`, `reorder`, `setArchived`, `move`, `remove`, `setDeployment` | | The former functions for the sections of a deliverable. They stay for one release. A new caller uses the `sections` functions. |
 
-**Move to another home** (`sections.moveHome`). The section keeps its title, colour, completion, deadline links, and its own `dependsOn`. Its tasks follow it, each with its subtree, with the project and the deliverable of the new home. It lands at the end of the new home, or just above the first section there that depends on it. Refusals:
+**Move to another home** (`sections.moveHome`). The section keeps its title, completion, deadline links, and its own `dependsOn`. Its tasks follow it, each with its subtree, with the project and the deliverable of the new home. It lands at the end of the new home, or just above the first section there that depends on it. Refusals:
 
 | Code | Cause |
 |------|-------|
 | `section_role_locked` | A backlog, queue, or inbox section |
+| `section_named_locked` | The named section of a project, a deliverable, or a deployment: it goes only with its home |
 | `closer_locked` | A legacy closer |
 | `subsection_archived` | An archived section (unarchive it first) |
 | `section_move_same_home` | The section is already in that home |
