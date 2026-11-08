@@ -657,10 +657,10 @@ Steps take an ID or URL alone, or a title or short ID with `--plan <plan>` (a pl
 | `ops step delete <step> [--plan]` — soft; `plan undo` revives it | `ops step delete Deploy --plan Launch` |
 | `ops step split <step> [--before] [--title <t>] [--start] [--shore] [--assign <member>]` — `plans.splitNode`: a new step after the step (`--before`: before it); `--start` makes it active; `--shore` puts it on the shore (a planned stream step only, else `node_shore_invalid`) | `ops step split <stepId> --title "Review"` |
 | `ops step split-beside <step> [--title <t>] [--assign <member>]` — `plans.splitBeside`: a new step beside the step, with the same `requires`, cross links, substream, and state; a done step refuses (`node_gated`) | `ops step split-beside <stepId> --title "Docs"` |
-| `ops step state <planned\|active\|done> <steps...> [--shore\|--no-shore]` — `plans.setStepState` | `ops step state active <a> <b>` |
+| `ops step state <planned\|active\|done> <steps...> [--shore\|--no-shore]` — `plans.setStepState`; with `planned`, `--shore` puts stream steps on the shore and `--no-shore` takes them off | `ops step state active <a> <b>` |
 | `ops step done-next <step> [--title <t>] [--assign <member>]` — `plans.doneAndNext`: the step is done, and a new active step comes after it; a step that is not active refuses (`node_not_doing`) | `ops step done-next <stepId> --title "Deploy"` |
-| `ops step move-links --link <from>:<to>... --end from\|to --target <step>` — `plans.moveLinks`: move one end of each edge to another step | `ops step move-links --link <a>:<b> --end to --target <c>` |
-| `ops step remove-links <from>:<to>...` — `plans.removeLinks` | `ops step remove-links <a>:<b>` |
+| `ops step move-links --link <from>:<to> [--link <from>:<to>]... --end from\|to --target <step> [--plan\|--stream]` — `plans.moveLinks`: the links share one end; that end moves to the target step | `ops step move-links --link <a>:<b> --end to --target <c>` |
+| `ops step remove-links <from>:<to>... [--plan\|--stream]` — `plans.removeLinks`; a link that is gone already is skipped | `ops step remove-links <a>:<b>` |
 | `ops step place <step> --x <x> --y <y>` — `plans.setBoardPositions`: the place on the Trident lane, in board units | `ops step place <stepId> --x 320 --y 80` |
 
 **The drag rule.** `--with-downstream` matches the web canvas
@@ -695,10 +695,10 @@ a short ID needs `--stream <stream>`. A `<substream>` is an ID; a title needs
 
 | Command | Example |
 |---|---|
-| `ops stream list [--state active\|paused\|done\|all]` — the streams of the org | `ops stream list --state all` |
-| `ops stream show <stream>` — the lane: the attachments, the substreams, the steps by zone (shore, planned, active, done), the parked steps, the `requires` edges, the cross links, and the linked records | `ops stream show "Launch lane" --json` |
+| `ops stream list [--state active\|paused\|done\|all]` — the streams of the org, in the order of the Streams menu (default `--state all`) | `ops stream list --state all` |
+| `ops stream show <stream>` — the lane: the attachments, the substreams, and the steps by zone (shore, planned, active, done, parked), with the `requires` edges, the cross links, and the linked records | `ops stream show "Launch lane" --json` |
 | `ops stream create <title> [--description <text>]` | `ops stream create "Launch lane"` |
-| `ops stream update <stream> [--title <t>] [--description <text>] [--state active\|paused\|done]` | `ops stream update "Launch lane" --state paused` |
+| `ops stream update <stream> [--title <t>] [--description <text>] [--state active\|paused\|done]` — an empty description removes it | `ops stream update "Launch lane" --state paused` |
 | `ops stream delete <stream>` — a soft delete (`streams.remove`); `ops stream undo` brings the lane back with its steps. A stream has no archive state | `ops stream delete "Old lane"` |
 | `ops stream attach <stream> <places...>` — the places that the lane serves | `ops stream attach "Launch lane" project:Alpha deliverable:"Alpha › v1"` |
 | `ops stream detach <stream> [places...] [--all]` | `ops stream detach "Launch lane" --all` |
@@ -706,7 +706,7 @@ a short ID needs `--stream <stream>`. A `<substream>` is an ID; a title needs
 | `ops stream history <stream>` — the undo and redo stacks of the lane | `ops stream history "Launch lane" --json` |
 | `ops stream undo\|redo <stream> [--expect <seq>] [--dry-run]` — read `history` first; the rules of `ops undo` hold | `ops stream undo "Launch lane" --expect 12` |
 | `ops stream step add <stream> <title> [--after <step>]... [--state planned\|active\|done] [--shore] [--description <text>] [--assign <member>]` | `ops stream step add "Launch lane" "Write the copy" --shore` |
-| `ops stream step add-task <stream> <task> [--state planned\|active\|done] [--shore]` — a step that is an existing task | `ops stream step add-task "Launch lane" <taskId>` |
+| `ops stream step add-task <stream> <task> [--state planned\|active\|done] [--shore]` — a step that is an existing task; `--state` moves the task to that state; `--shore` only for a task that is to do | `ops stream step add-task "Launch lane" <taskId>` |
 | `ops stream step create-task <step> --to section:<ref>\|project:<ref> [--stream <stream>]` — make a task for a step (`project:` is its backlog) | `ops stream step create-task <stepId> --to project:Alpha` |
 | `ops stream step move <steps...> --to <stream> [--stream <stream>]` — to another lane | `ops stream step move <a> <b> --to "Next lane"` |
 | `ops stream step park\|unpark <steps...> [--stream <stream>]` | `ops stream step park <stepId>` |
@@ -721,7 +721,7 @@ a short ID needs `--stream <stream>`. A `<substream>` is an ID; a title needs
 | `ops stream drawing list <stream>` | `ops stream drawing list "Launch lane"` |
 | `ops stream drawing add <stream> --kind line\|free\|text --points <x1,y1,...> [--text <words>]` | `ops stream drawing add "Launch lane" --kind text --points 40,40 --text "Ship gate"` |
 | `ops stream drawing text <stream> <drawing> <text>` — an empty text removes the drawing | `ops stream drawing text "Launch lane" <drawingId> "Gate 2"` |
-| `ops stream drawing move <stream> <drawings...> --dx <n> --dy <n>` | `ops stream drawing move "Launch lane" <drawingId> --dx 20 --dy 0` |
+| `ops stream drawing move <stream> <drawings...> [--dx <n>] [--dy <n>]` — right and down are positive (default 0) | `ops stream drawing move "Launch lane" <drawingId> --dx 20 --dy 0` |
 | `ops stream drawing remove <stream> <drawings...>` | `ops stream drawing remove "Launch lane" <drawingId>` |
 
 ### workspace (Trident)
@@ -815,16 +815,19 @@ text: only the ID counts.
 | `ops notepad show <notepad> [--md]` — the title, the facts (with the `rev`), then the Markdown; `--md` prints only the Markdown; `--json`: `{notepad, blocks, tasks, markdown}` | `ops notepad show "Standup notes" --md > notes.md` |
 | `ops notepad create <title> [--general] [--body <md\|->] [--section <s>]` — personal unless `--general` | `ops notepad create "Sprint notes" --general --section Backend` |
 | `ops notepad rename <notepad> <title>` | `ops notepad rename <notepadId> "Weekly standup"` |
-| `ops notepad scope <notepad> (<section> \| --clear)` — link to one section, or remove the link | `ops notepad scope <notepadId> Backend` |
+| `ops notepad section <notepad> (<section> \| --clear)` — `notepads.setSection`: link to one section, or remove the link; `ops notepad scope` is its other name | `ops notepad scope <notepadId> Backend` |
 | `ops notepad append <notepad> [<md\|->] [--task <task>]` — add Markdown at the end, or a task mention with `--task` | `ops notepad append <notepadId> "- Call Sam about the beta"` |
 | `ops notepad write <notepad> <md\|-> (--expected-rev <rev> \| --force)` — replace all content; a change after `rev` refuses the write; `--force` replaces the content that is there now (a change after your read is lost) | `ops notepad write <notepadId> - --expected-rev 3 < notes.md` |
 | `ops notepad to-task <notepad> <text> [--section <s> \| --project <p> \| --backlog] [--title <t>] [--keep]` — make a task from a text; a task chip replaces the text (`--keep`: the chip follows it); with no destination flag, the task goes to the section of the notepad; a notepad with no scope needs a flag | `ops notepad to-task <notepadId> "Call Sam about the beta" --backlog` |
 | `ops notepad move-to-task <notepad> <task> <text> [--copy]` — move a text to the end of a task description (`--copy`: leave it in the notepad) | `ops notepad move-to-task <notepadId> <taskId> "The budget is 4k."` |
 | `ops notepad delete <notepad>` — a soft delete: the notepad leaves every list and read | `ops notepad delete <notepadId>` |
-| `ops notepad block add\|edit\|remove\|move …` — `notepads.addBlock`, `updateBlock`, `removeBlock`, `moveBlock`: one text block of the notepad (see `ops notepad block --help`) | `ops notepad block add <notepadId> "- A new line"` |
-| `ops notepad section <notepad> <section\|none>` — `notepads.setSection`: the section that the notepad links | `ops notepad section <notepadId> none` |
+| `ops notepad block list <notepad>` — the text blocks with their IDs | `ops notepad block list <notepadId> --json` |
+| `ops notepad block add <notepad> <text> [--after <block>]` — `notepads.addBlock`; default: at the top | `ops notepad block add <notepadId> "- A new line" --after <blockId>` |
+| `ops notepad block edit <notepad> <block> <text> [--expect <text>]` — `notepads.updateBlock`; `--expect` guards the text that you read | `ops notepad block edit <notepadId> <blockId> "- The line"` |
+| `ops notepad block remove <notepad> <block>` — `notepads.removeBlock` | `ops notepad block remove <notepadId> <blockId>` |
+| `ops notepad block move <notepad> <block> (--after <block> \| --top)` — `notepads.moveBlock` | `ops notepad block move <notepadId> <blockId> --top` |
 | `ops notepad make-task <notepad> <text> [--title <t>]` — make a task from a text of the notepad; a task chip replaces the text | `ops notepad make-task <notepadId> "Call Sam"` |
-| `ops notepad undo-make-task <notepad> <task> --expect <state>` — take back one `make-task` | `ops notepad undo-make-task <notepadId> <taskId> --expect <state>` |
+| `ops notepad undo-make-task <notepad> <task> --expect <state>` — take back one `make-task`; `--expect` is the `taskState` of the `make-task` result | `ops notepad undo-make-task <notepadId> <taskId> --expect <state>` |
 
 Traps:
 
@@ -881,9 +884,9 @@ address, or a web URL. A `<shareId>` is the ID of one access line (from
 |---|---|
 | `ops share list <record>` — `shares.forEntity`: the access lines of the record | `ops share list project:Alpha --json` |
 | `ops share access <record>` — `shares.viewerAccess`: how you reach the record | `ops share access task:<taskId>` |
-| `ops share add <record> --to org:<slug>\|person:<member> [--permission reader\|editor]` — `shares.share` | `ops share add project:Alpha --to person:@ana --permission editor` |
+| `ops share add <record> --to org:<slug>\|person:<user ID> [--permission reader\|editor]` — `shares.share`; `person:` takes the Clerk user ID (`user_…`; the field `clerkUserId` of `ops people show <@handle\|email> --json`); a share to the same subject changes its permission; needs admin | `ops share add project:Alpha --to person:user_2abc --permission editor` |
 | `ops share permission <shareId> <reader\|editor>` — `shares.setPermission` | `ops share permission <shareId> reader` |
-| `ops share remove <shareId>` — `shares.unshare` | `ops share remove <shareId>` |
+| `ops share remove <shareId>` — `shares.unshare`; it sends no notice | `ops share remove <shareId>` |
 | `ops share with` — `shares.sharedWith`: the records that other orgs shared with the active workspace (`--org` picks the workspace) | `ops share with --org me` |
 
 ### calendar
@@ -900,7 +903,7 @@ its events. The colours: `water`, `fire`, `earth`, `air`, `sun`, `moon`,
 | `ops calendar show <calendar>` | `ops calendar show Team` |
 | `ops calendar create <name> [--color <c>]` | `ops calendar create Releases --color sun` |
 | `ops calendar update <calendar> [--name <n>] [--color <c>]` | `ops calendar update Releases --name "Release days"` |
-| `ops calendar delete <calendar>` | `ops calendar delete Releases` |
+| `ops calendar delete <calendar> --yes` — deletes every event on it; no undo; refuses without `--yes` (`confirm_required`) | `ops calendar delete Releases --yes` |
 | `ops calendar default <calendar>` — `calendar.setDefaultCalendar` | `ops calendar default Team` |
 
 ### event
@@ -915,12 +918,12 @@ in [[dev-knw-ops-data_model]] § Calendars and Events.
 
 | Command | Example |
 |---|---|
-| `ops event list [--from <day>] [--to <day> \| --days <n>] [--calendar <calendar>] [--tz <zone>]` | `ops event list --from today --days 7` |
+| `ops event list [--from <day>] [--to <day> \| --days <n>] [--calendar <calendar>] [--tz <zone>]` — the occurrences in a window (each repeat expanded); `--from` default today; `--to` is not in the window; `--days` 1 to 100, default 7 | `ops event list --from today --days 7` |
 | `ops event show <event>` | `ops event show <eventId>` |
-| `ops event create <title> (--start <datetime> --end <datetime> [--tz <zone>] \| --date <day> [--until <day>]) [--calendar <calendar>] [--repeat daily\|weekly\|monthly\|yearly] [--notes <text>] [--place <text>] [--link <url>] [--color <c>] [--person <member>]... [--guest "Name <email>"]... [--attach task:<ref>\|deadline:<ref>]...` | `ops event create "Launch week" --date 2026-11-16 --until 2026-11-20` |
-| `ops event update <event> [the fields of create] [--occurrence <day>] [--scope this\|following\|all]` — for a repeated event, `--occurrence` names one day, and `--scope` says which occurrences change | `ops event update <eventId> --occurrence 2026-11-18 --scope this --start "2026-11-18 10:00" --end "2026-11-18 11:00"` |
-| `ops event delete <event> [--occurrence <day>] [--scope this\|following\|all]` | `ops event delete <eventId> --occurrence 2026-11-18 --scope following` |
-| `ops event attach\|detach <event> task:<ref>\|deadline:<ref>` | `ops event attach <eventId> task:<taskId>` |
+| `ops event create <title> (--start <datetime> (--end <datetime> \| --duration <length>) [--tz <zone>] \| --date <day> [--until <day>]) [--calendar <calendar>] [--repeat daily\|weekly\|monthly\|yearly [--every <n>] [--weekdays mon,wed,fri] [--month-by day\|weekday] [--count <n> \| --repeat-until <day>]] [--notes <text>] [--place <text>] [--link <url>] [--color <tone>] [--person <member>]... [--guest "Name <email>"]... [--attach task:<ref>\|deadline:<ref>]...` — `--start` is `YYYY-MM-DDTHH:mm` in `--tz` (default: the zone of the machine), `"tomorrow 09:00"`, or an ISO time with an offset; `--duration` is `30m`, `1h`, `1h30m`; `--date` is `YYYY-MM-DD`, `today`, `tomorrow`, or `+3d`; `--until` is the last day, in the event; you are always on the event | `ops event create "Standup" --start 2026-11-10T09:00 --end 2026-11-10T09:15 --tz Australia/Sydney --repeat weekly --weekdays mon,wed,fri` |
+| `ops event update <event> [--title <t>] [the fields of create] [--calendar <calendar>] [--no-guests] [--occurrence <day>] [--scope this\|following\|all]` — only the given fields change; `--calendar` moves the event; `--repeat none` stops a repeat; `none` clears `--notes`, `--place`, and `--link`; `--person` and `--guest` replace the list; for a series, `--occurrence` names one day (its local date), and `--scope` says which occurrences change (default `all`) | `ops event update <eventId> --occurrence 2026-11-18 --scope this --start "2026-11-18 10:00" --end "2026-11-18 11:00"` |
+| `ops event delete <event> [--occurrence <day>] [--scope this\|following\|all]` — default `all`: the whole series | `ops event delete <eventId> --occurrence 2026-11-18 --scope following` |
+| `ops event attach\|detach <event> task:<ref>\|deadline:<ref>` — of a series: on each occurrence | `ops event attach <eventId> task:<taskId>` |
 | `ops event for task:<ref>\|deadline:<ref>` — `calendar.eventsForRecord`: the events of a record | `ops event for task:<taskId>` |
 
 ### deployment
@@ -1034,7 +1037,7 @@ release session); before that, each one fails on prod with
 | Command | What it does, and its traps |
 |---|---|
 | `ops address <record> [--kind project\|deliverable\|section\|task\|deployment\|taskgroup\|notepad\|plan\|step\|deadline\|blocker]` | The address of any record: the display address (the alias, else the id form), the id address, the `nuu://ops/<type>/<id>` URI, and `canRename`. A project, a deliverable, a task, a task group, and a notepad have an address row. A section, a deployment, and a blocker have the id form only (`@v1/<org>/section/<id>#ops`, `@v1/<org>/blocker/<id>#ops`; a blocker reads it from `blockers.get`). A plan, a step, a deadline, and a day label have no address: use the ID. A title needs `--kind`. `moved: true` means that the text is an old alias or an old form: use the printed address. |
-| `ops address rename <record> <name>` / `ops address rename <record> --clear` | `addresses.rename`: set the alias of the address of a project, a deliverable, a task, a notepad, or a task group, or remove it. It needs owner rights. A deliverable is renamed inside its project, and its name cannot be removed (`name-required`). Other refusals: `name-taken` (with a suggestion), `name-invalid`, `name-like-id`, `name-reserved`. |
+| `ops address rename <record> [name] [--clear]` | `addresses.rename`: set the alias of the address of a project, a deliverable, a task, a notepad, or a task group, or remove it. It needs owner rights. A deliverable is renamed inside its project, and its name cannot be removed (`name-required`). Other refusals: `name-taken` (with a suggestion), `name-invalid`, `name-like-id`, `name-reserved`. |
 | `ops people search <text> [--limit 1-50]`, `ops people show <@handle\|email\|user_id>` | The profiles in the scope of the active org. `people show` takes a `@handle`, an email, or a Clerk `user_` id; not `me`, and not the users-table id of `ops whoami`. `ops member list` gives the user rows that task owners and assignees use. |
 | `ops project link <project> <uri...>` | Links NUU Connect URIs (`nuu://<app>/<type>/<id>`) to a project. Each URI is stored one time; at most 50. A bad URI gives `connect_bad_request` (exit 1). `--json` gives `{id, connectRefs}`. |
 | `ops project unlink <project> <uri>` | Removes one URI. A URI that is not linked changes nothing. |
