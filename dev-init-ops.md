@@ -95,10 +95,10 @@ Before any work, make sure that the `ops` CLI is installed and that a nuu creden
 # From the NUU monorepo. Choose one build.
 ndv use ops dev      # the `ops` command on PATH runs the dev build
 ndv use ops prod     # the `ops` command on PATH runs the prod build
-ops mode             # shows the build, the data, the site, and the credential
+ops whoami           # a dev build shows the row `data mode`; a prod build shows the row `site`
 
-# Sign in. The CLI uses the shared nuu CLI credential of the data mode.
-ops login            # the sign-in for the current data mode
+# Sign in. The CLI uses the shared nuu CLI credential.
+ops login            # the browser sign-in
 nuu login            # prod credential: ~/.nuucognition/auth.json
 ndv run nuu login    # dev credential:  ~/.nuucognition/auth.local.json (local nuu-account on port 3000)
 ```
@@ -107,9 +107,9 @@ Outside the monorepo, the npm package `@nuucognition/ops-cli` gives one command,
 
 ndv names the link `ops` in both profiles. The name `ops-dev` is only a package bin inside the monorepo, so do not expect it on PATH. The CLI source is `apps/cli-ops` in the monorepo.
 
-**The `ops` on PATH can be the prod build.** A prod build always uses PROD data and ignores `OPS_DATA_MODE`. So `OPS_DATA_MODE=dev ops task create …` with a prod build **writes to PROD**. Before the first write, do these checks:
+**The `ops` on PATH can be the prod build.** A prod build has no data mode: it always uses PROD data and ignores `OPS_DATA_MODE`. So `OPS_DATA_MODE=dev ops task create …` with a prod build **writes to PROD**. Before the first write, do these checks:
 
-1. Run `ops mode`. Read the line `build mode` (`prod` or `dev`) and the line `data mode`. Write only when the data mode is the data of the request.
+1. Run `ops whoami` and read the row after `sign-in`. A prod build shows `site`, and it uses PROD data. A dev build shows `data mode`. Write only when the data is the data of the request.
 2. Run `ops --help`. It must list `headers`, `route`, `search`, and `section`. When it does not, the build is of before the revamp: rebuild it (`ndv build ops` or `ndv build ops prod`), or use the dev launcher below.
 
 For DEV data, run the dev launcher of the monorepo checkout with `OPS_DATA_MODE=dev`. It is always a dev build, so the variable holds for it. Without the variable, the dev launcher uses PROD data:
@@ -123,7 +123,7 @@ OPS_DATA_MODE=dev node "<monorepo>/apps/cli-ops/bin/ops.js" headers --org me
 
 ## Modes
 
-The mode selects the Convex deployment and the credential together.
+A prod build has no data mode, and it has no command `ops mode`. In a dev build, the data mode selects the Convex deployment and the credential together.
 
 | Build on PATH as `ops` | Data | Deployment | Credential |
 |------------------------|------|------------|------------|
@@ -131,7 +131,7 @@ The mode selects the Convex deployment and the credential together.
 | Dev build (`ndv use ops dev`), no choice | **prod (default since Task 415)** | `acoustic-weasel-248` | `auth.json` |
 | Dev build with `OPS_DATA_MODE=dev` | dev | `next-dalmatian-912` | `auth.local.json` |
 
-**A dev build uses PROD data by default** (Task 415), with the sign-in of `nuu login`, and prints one stderr note: `note: this dev build uses PROD data …: each write is real. For dev data: OPS_DATA_MODE=dev.` A dev build takes the first choice that it finds: `OPS_DATA_MODE`, a test run (dev data), `NUU_DATA_MODE`, the shared file `~/.nuucognition/dev-data.json` (`ops mode dev|prod` and `flint env use` write it), then prod. A prod build ignores all of them. The old file `~/.nuucognition/ops-dev-data.json` is not read any more. For dev data, set `OPS_DATA_MODE=dev` on each command. Before a write, run `ops mode` and read the line `data mode` and its source. A test write on prod data is a real write that people see.
+**A dev build uses PROD data by default** (Task 415), with the sign-in of `nuu login`, and prints one stderr note: `note: this dev build uses PROD data …: each write is real. For dev data: OPS_DATA_MODE=dev.` A dev build takes the first choice that it finds: `OPS_DATA_MODE`, a test run (dev data), `NUU_DATA_MODE`, the shared file `~/.nuucognition/dev-data.json` (`ops mode dev|prod` and `flint env use` write it), then prod. A prod build ignores all of them. The old file `~/.nuucognition/ops-dev-data.json` is not read any more. For dev data, set `OPS_DATA_MODE=dev` on each command. Before a write with a dev build, run `ops mode` and read the line `data mode` and its source. A test write on prod data is a real write that people see.
 
 ## Organisations
 
@@ -140,7 +140,7 @@ Every Operations record belongs to one organisation (`orgSlug`). There are two k
 - **Personal workspace.** Every person has one. Its `orgSlug` is the person's Clerk user ID (for example `user_2abc…`). In a web URL its token is `me`.
 - **Team organisation.** Its `orgSlug` is the team slug. The operator's JWT lists the teams the operator belongs to.
 
-The CLI acts in the active organisation: `--org <slug|name|me>` on the command line, else the default stored per data mode (`ops org use <slug|name|me>`, under `~/.nuucognition/ops/`), else the personal workspace. A command on a record given by ID or URL acts in the record's own organisation. Prefer `--org` on each command over a change of the stored default. Use the personal workspace for tests on prod data.
+The CLI acts in the active organisation: `--org <slug|name|me>` on the command line, else the stored default (`ops org use <slug|name|me>`, under `~/.nuucognition/ops/`), else the personal workspace. A command on a record given by ID or URL acts in the record's own organisation. Prefer `--org` on each command over a change of the stored default. Use the personal workspace for tests on prod data.
 
 ## Safety Rules
 
@@ -173,7 +173,7 @@ Every command that shows a task or a place prints its web link or its address. T
 
 Read [[dev-knw-ops-cli]] for every command, flag, and error code. The essentials:
 
-- Most commands are `ops <noun> <verb>`: `org`, `member`, `project`, `deliverable`, `section`, `task`, `deployment`, `comment`, `backlog`, `deadline`, `blocker`, `plan`, `step`, `stream`, `workspace`, `share`, `calendar`, `event`, `review`, `notify`, `activity`, `favourite`, `notepad`, `day`, `people`, `home`, `address`, `query`. These have no noun: `ops login`, `ops whoami`, `ops mode`, `ops ops`, `ops call`, `ops headers`, `ops route`, `ops search`, `ops history`, `ops undo`, and `ops redo`. `ops day-label` is gone (Task 390): a day label is an all-day event now (`ops event create <title> --date <day> [--until <day>]`). `ops <noun> <verb> --help` shows the arguments, the options, and examples. A noun with no verb (`ops task`) is a usage error that lists the verbs. The former words still work and are hidden: `ops subsection` and `--subsection`. `ops folder` is gone (0.1.0-dev.3).
+- Most commands are `ops <noun> <verb>`: `org`, `member`, `project`, `deliverable`, `section`, `task`, `deployment`, `comment`, `backlog`, `deadline`, `blocker`, `plan`, `step`, `stream`, `workspace`, `share`, `calendar`, `event`, `review`, `notify`, `activity`, `favourite`, `notepad`, `day`, `people`, `home`, `address`, `query`. These have no noun: `ops login`, `ops whoami`, `ops ops`, `ops call`, `ops headers`, `ops route`, `ops search`, `ops history`, `ops undo`, and `ops redo`. A dev build also has `ops mode`. `ops day-label` is gone (Task 390): a day label is an all-day event now (`ops event create <title> --date <day> [--until <day>]`). `ops <noun> <verb> --help` shows the arguments, the options, and examples. A noun with no verb (`ops task`) is a usage error that lists the verbs. The former words still work and are hidden: `ops subsection` and `--subsection`. `ops folder` is gone (0.1.0-dev.3).
 - A record argument takes an ID, an address, a web URL, a title, or a path (`"Alpha › v1 › Backend"`). A title that matches more than one record fails with `<kind>_ambiguous` (exit 2) and lists the candidates with their paths. Run the command again with the ID or the address. Never guess.
 - A place of `ops task move --to` is `section:<ref>`, `project:<ref>` (its backlog), `deliverable:<ref>` (its main section: the named section of the deliverable), `deployment:<ref>` (its inbox), `parent:<task>` (a subtask), `backlog`, `master`, or `unplaced`. A move takes the subtree.
 - Every line that shows a record ends with its address, and `--json` has an `address` field. Keep it for the next command.
@@ -233,7 +233,7 @@ The sections above hold the model, the prerequisite, the modes, the organisation
 
 ## Before You Write
 
-1. Run `ops mode`. It confirms that the CLI is installed, and it shows the build mode, the data mode, the site, and the credential file. The command on PATH is `ops` for the dev build and for the prod build, so read the line `build mode`: the `ops` on PATH can be the prod build.
+1. Run `ops whoami`. It confirms that the CLI is installed and signed in. The command on PATH is `ops` for the dev build and for the prod build. A dev build shows the row `data mode`. A prod build shows the row `site`, and it uses PROD data.
 2. Confirm the data. If the prompt does not say which data to use, use dev data. A prod build is always on PROD data and ignores `OPS_DATA_MODE`: never run `OPS_DATA_MODE=dev ops …` with a prod build. For DEV data, use the dev launcher: `OPS_DATA_MODE=dev node "<monorepo>/apps/cli-ops/bin/ops.js" …` (§ Prerequisite). Run `… mode` with it and check `build mode dev` and `data mode dev` before the first write. Do not run `ops mode prod` or `ops mode dev` unless the prompt asks for that data.
 3. Check the commands. `ops --help` must list `headers`, `route`, `search`, and `section`. When it does not, the build is of before the revamp: use the dev launcher (for DEV data), or stop and report it (for PROD data).
 4. Confirm the organisation with `ops whoami`. If the prompt does not name one, use the personal workspace (`--org me`), and say so in the result. Pass `--org` on each command; do not change the stored default with `ops org use` unless the prompt asks.

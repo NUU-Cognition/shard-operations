@@ -30,7 +30,7 @@ Build a plan on the Operations canvas from a written plan. The steps get `requir
 
 ## Stage 1: Ground and Read
 
-1. Run `ops mode` and `ops whoami --json`. Note the data mode and the org. Use `--org` when the plan belongs to another org.
+1. Run `ops whoami --json`. Note the org and the data: a dev build gives the field `dataMode`, and a build with no such field uses PROD data. Use `--org` when the plan belongs to another org.
 2. Make sure [[dev-knw-ops-canvas]] and [[dev-knw-ops-cli]] are in context.
 3. Read the written plan in full. If it is a Mesh file, read the file.
 4. If the target plan exists, read it: `ops plan show <plan> --json`. Note its steps, positions, and sentinels.

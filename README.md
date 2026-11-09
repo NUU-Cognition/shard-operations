@@ -12,7 +12,7 @@ The shard teaches an agent the Operations data model, the plan canvas rules, the
 
 ## Prerequisite
 
-- The `ops` CLI: `ndv use ops dev` or `ndv use ops prod`. Both put the command `ops` on PATH. `ops mode` shows which build and which data it uses. A dev build uses PROD data by default; set `OPS_DATA_MODE=dev` for dev data.
+- The `ops` CLI: `ndv use ops dev` or `ndv use ops prod`. Both put the command `ops` on PATH. `ops whoami` shows which data it uses: a dev build has the row `data mode`, and a prod build has the row `site` and uses PROD data. A dev build uses PROD data by default; set `OPS_DATA_MODE=dev` for dev data.
 - A signed-in nuu credential: `ops login`, `nuu login` (prod), or `ndv run nuu login` (dev).
 
 ## Structure

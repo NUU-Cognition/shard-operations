@@ -22,7 +22,7 @@ Create one task (or one subtask) in the right place, and check that Ops put it t
 
 # Actions
 
-1. **Ground.** Run `ops mode` and `ops whoami --json`. Read the `build mode` and the `data mode` lines of `ops mode` before the first write: the `ops` on PATH can be the prod build, and a prod build writes to PROD data whatever `OPS_DATA_MODE` says. For DEV data, use the dev launcher (`OPS_DATA_MODE=dev node <monorepo>/apps/cli-ops/bin/ops.js …`; see the init § Prerequisite). `ops --help` must list `headers`, `route`, `search`, and `section`; when it does not, the build is of before the revamp: stop and report it. Pass `--org <org>` on each command when the task belongs to an org that is not active.
+1. **Ground.** Run `ops whoami --json` before the first write. A dev build gives the field `dataMode`. A prod build has no such field: the `ops` on PATH can be the prod build, and a prod build writes to PROD data whatever `OPS_DATA_MODE` says. For DEV data, use the dev launcher (`OPS_DATA_MODE=dev node <monorepo>/apps/cli-ops/bin/ops.js …`; see the init § Prerequisite). `ops --help` must list `headers`, `route`, `search`, and `section`; when it does not, the build is of before the revamp: stop and report it. Pass `--org <org>` on each command when the task belongs to an org that is not active.
 2. **Pick the place.** Use the first rule that applies:
    1. **The request names a place.** Use its flag:
 

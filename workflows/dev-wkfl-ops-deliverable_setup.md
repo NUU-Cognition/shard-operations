@@ -30,7 +30,7 @@ Turn a scope description into a deliverable in a project. The deliverable gets s
 
 ## Stage 1: Ground and Read
 
-1. Run `ops mode` and `ops whoami --json`. Use `--org` when the project belongs to another org.
+1. Run `ops whoami --json`. Use `--org` when the project belongs to another org.
 2. Make sure [[dev-knw-ops-data_model]] § Deliverables, § Sections, and § Deadlines are in context. Key rules:
    - `ops deliverable create` makes the main section of the deliverable (Task 406: a locked section with the name of the deliverable; `section_named_locked` on a rename, move, archive, or delete) and no task. `--section "<title>"` makes a first plain section in the same command.
    - A new section goes to the end of its deliverable, or after the section that `--after` names.

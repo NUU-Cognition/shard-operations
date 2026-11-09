@@ -23,7 +23,7 @@ Put the inbox of one deployment in order. Each open task gets one decision: fix 
 
 # Actions
 
-1. **Ground.** Run `ops mode` and `ops whoami --json`. Read the `build mode` and the `data mode` lines of `ops mode` before the first write: the `ops` on PATH can be the prod build, and a prod build writes to PROD data whatever `OPS_DATA_MODE` says. For DEV data, use the dev launcher (`OPS_DATA_MODE=dev node <monorepo>/apps/cli-ops/bin/ops.js …`; see the init § Prerequisite). `ops --help` must list `headers`, `route`, `search`, and `section`; when it does not, the build is of before the revamp: stop and report it. Pass `--org <org>` when the deployment belongs to an org that is not active.
+1. **Ground.** Run `ops whoami --json` before the first write. A dev build gives the field `dataMode`. A prod build has no such field: the `ops` on PATH can be the prod build, and a prod build writes to PROD data whatever `OPS_DATA_MODE` says. For DEV data, use the dev launcher (`OPS_DATA_MODE=dev node <monorepo>/apps/cli-ops/bin/ops.js …`; see the init § Prerequisite). `ops --help` must list `headers`, `route`, `search`, and `section`; when it does not, the build is of before the revamp: stop and report it. Pass `--org <org>` when the deployment belongs to an org that is not active.
 2. **Read the deployment.** Run `ops deployment show <deployment> --json`. Check:
    - `status`: `live`, `paused`, or `retired`. Only a live deployment has an inbox for new tasks. A paused or retired deployment keeps its inbox and gets no check-up tasks.
    - The version label, the check schedule, and the notes.

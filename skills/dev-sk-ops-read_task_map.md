@@ -20,7 +20,7 @@ Read everything around one task in one command: where it lives, the tree that it
 
 # Actions
 
-0. **Ground.** Run `ops mode`. A read is safe on both data modes, but read the `data mode` line, so that you report the data that you read. `ops --help` must list `headers`, `route`, `search`, and `section` (else the build is of before the revamp and has no `ops task map`).
+0. **Ground.** Run `ops whoami --json`. A read is safe on both builds, but report the data that you read: a dev build gives the field `dataMode`, and a build with no such field reads PROD data. `ops --help` must list `headers`, `route`, `search`, and `section` (else the build is of before the revamp and has no `ops task map`).
 1. **Choose the read.**
 
    | Question | Command |

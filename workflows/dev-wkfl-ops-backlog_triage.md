@@ -37,7 +37,7 @@ Review one backlog and put it in order. A backlog is a section with the role `ba
 
 ## Stage 1: Ground and Read
 
-1. Run `ops mode` and `ops whoami --json`. Use `--org` when the backlog belongs to another org.
+1. Run `ops whoami --json`. Use `--org` when the backlog belongs to another org.
 2. Make sure [[dev-knw-ops-data_model]] § Backlogs, § Tasks, and § Sections are in context. Key rules:
    - A backlog sorts its tasks by the priority ladder `urgent → high → medium → (none) → low`, then by `order`.
    - A list shows root tasks only, each with the count of its subtasks. A move takes the subtree.

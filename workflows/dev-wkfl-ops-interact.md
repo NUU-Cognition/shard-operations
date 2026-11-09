@@ -32,10 +32,10 @@ The operator asks for something in Operations: read a record, create or change r
 
 ## Stage 1: Ground
 
-1. Run `ops mode` and `ops whoami --json`. Note the data mode (dev or prod) and the active org.
+1. Run `ops whoami --json`. Note the active org and the data: a dev build gives the field `dataMode` (dev or prod), and a build with no such field uses PROD data.
    - Exit code 3 (`auth_required`, `unauthenticated`): ask the operator to run `ops login` (or `nuu login` for prod, `ndv run nuu login` for dev). Stop until the operator confirms.
    - If the request names an org that is not active, plan to pass `--org <slug|name|me>` on every command. Do not change the stored default unless the operator asks.
-   - If the data mode is not the one the request needs, tell the operator. Change it with `ops mode dev|prod` only on the operator's word.
+   - If the data is not the data that the request needs, tell the operator. A prod build has no other data. On a dev build, change it with `ops mode dev|prod` only on the operator's word.
 2. Make sure [[dev-sk-ops-use_operations]], [[dev-knw-ops-data_model]], and [[dev-knw-ops-cli]] are in context. Do not guess command shapes or rules.
 3. Restate the request in one sentence. Map it to a command with the job table of [[dev-sk-ops-use_operations]] § 6, then check its flags in [[dev-knw-ops-cli]]. When no command fits a read, use `ops query` (§ 7 of that skill). These skills cover the common requests:
    - a new task in the right place: [[dev-sk-ops-create_task]];

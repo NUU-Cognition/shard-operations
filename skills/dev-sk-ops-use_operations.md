@@ -75,9 +75,9 @@ There are two builds of the CLI. The build decides the data.
 
 A dev build takes the first choice that it finds: `OPS_DATA_MODE`, a test run (dev data), `NUU_DATA_MODE`, the shared file `~/.nuucognition/dev-data.json` (`ops mode dev|prod` and `flint env use` write it), then prod. On prod data it prints one stderr note: each write is real.
 
-1. Run `ops mode` (or `ops-dev mode`). Read the lines `build mode` and `data mode`. Write only when the data mode is the data of the request. A test write goes to DEV data.
-2. When `ops-dev` is not on PATH, run the dev launcher of the monorepo: `OPS_DATA_MODE=dev node "<monorepo>/apps/cli-ops/bin/ops.js" <command>` (`<monorepo>` is `Repos/main` of the Tinderbox). It is always a dev build. Without `OPS_DATA_MODE=dev`, it uses PROD data. In the monorepo, `ndv use ops dev|prod` links the command `ops` to one build: then `ops mode` tells you which.
-3. Run `ops whoami`. It shows the user, the email, the data mode, and the active org. `ops --version` prints the version of the package. When a command fails with `auth_required` or `unauthenticated` (exit 3), the operator signs in: `nuu login` (or `ops login`, the sign-in of the current data mode, in a browser). An agent cannot sign in: ask the operator to run `nuu login`, or report it.
+1. Run `ops whoami` and read the row after `sign-in`. A prod build shows `site`, and it uses PROD data. A dev build shows `data mode` (`ops-dev mode` gives the details). Write only when the data is the data of the request. A test write goes to DEV data.
+2. When `ops-dev` is not on PATH, run the dev launcher of the monorepo: `OPS_DATA_MODE=dev node "<monorepo>/apps/cli-ops/bin/ops.js" <command>` (`<monorepo>` is `Repos/main` of the Tinderbox). It is always a dev build. Without `OPS_DATA_MODE=dev`, it uses PROD data. In the monorepo, `ndv use ops dev|prod` links the command `ops` to one build: then `ops whoami` tells you which.
+3. Read the rest of `ops whoami`: the user, the email, and the active org. `ops --version` prints the version of the package. When a command fails with `auth_required` or `unauthenticated` (exit 3), the operator signs in: `nuu login` (or `ops login`, in a browser). An agent cannot sign in: ask the operator to run `nuu login`, or report it.
 4. Run `ops --help` one time. It lists the command groups. When it does not list `headers`, `route`, `search`, and `section`, the build is of before the revamp: stop and report it.
 
 In this skill, `ops` names the command that you chose here.
@@ -87,7 +87,7 @@ In this skill, `ops` names the command that you chose here.
 
 ## 3. Pick the org
 
-The CLI acts in the active org: `--org <slug|name|me>` on the command, else the stored default of the data mode (`ops org use <org>`), else the personal workspace (`me`). A record that you give by ID, URL, or address acts in its own org.
+The CLI acts in the active org: `--org <slug|name|me>` on the command, else the stored default (`ops org use <org>`), else the personal workspace (`me`). A record that you give by ID, URL, or address acts in its own org.
 
 1. Run `ops org list` to see your orgs (`*` marks the active org).
 2. Pass `--org <org>` on each command. Do not change the stored default unless the operator asks.
@@ -275,7 +275,7 @@ Each recipe uses `--org <org>` when the org is not the active one. Use `--json` 
 
 # Safety Rules
 
-1. **Prod data is real.** A write on prod data is a real write that people see. Read `ops mode` before the first write. Test on dev data, in the org `test`, with a title that says it is a test. Remove each test record when the test is done.
+1. **Prod data is real.** A write on prod data is a real write that people see. Run `ops whoami` before the first write, and read its row after `sign-in`. Test on dev data, in the org `test`, with a title that says it is a test. Remove each test record when the test is done.
 2. **Act as the operator.** Each write is the operator's own write; Waybill records the operator as the actor, with the agent mark. Change only the records that the request names, in the org that it names.
 3. **Read before a delete.** A delete of a project or a deliverable (and of a deployment) needs an org owner or admin (`owner-only`). An agent that is a member archives a project (`ops project update <p> --status archived`), retires a deployment (`ops deployment status <d> retired`), and marks a deliverable done after the operator confirms. A delete can cascade: a project takes its deliverables, sections, and tasks; a deliverable takes its sections and tasks; a section takes its tasks; a plan takes its steps. The CLI refuses these deletes without `--yes` (`confirm_required`, exit 2): project, deliverable, section, deployment, plan, blocker, and calendar (a calendar takes its events). `ops task delete` and `ops notepad delete` take no `--yes`: read first. A task with subtasks needs `--with-subtasks`. Tell the operator what goes, and add `--yes` only after the operator confirms.
 4. **Undo only what you read.** Undo replays your last gesture in a scope, and that gesture can be one that the operator made in the web app. Read `ops history` first and pass `--expect <seq>`. The CLI refuses an undo or a redo without `--expect` (`expect_required`) unless you pass `--dry-run`. A blocker write is a Waybill gesture in the scope `org:<org>`: use `ops history --scope org:<org>` and `ops undo --scope org:<org> --expect <seq>`. A comment delete and a blocker delete cannot be undone: resolve or drop a blocker instead of a delete.

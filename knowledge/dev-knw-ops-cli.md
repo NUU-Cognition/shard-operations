@@ -18,7 +18,7 @@ Source: `apps/cli-ops` in the NUU monorepo (package `@nuucognition/ops-cli`). Th
 
 ## Shape of Every Command
 
-- Most commands are `ops <noun> <verb>`. These top-level commands have no noun: `ops login`, `ops whoami`, `ops mode`, `ops ops`, `ops call`, `ops headers`, `ops route`, `ops search`, `ops history`, `ops undo`, and `ops redo`.
+- Most commands are `ops <noun> <verb>`. These top-level commands have no noun: `ops login`, `ops whoami`, `ops ops`, `ops call`, `ops headers`, `ops route`, `ops search`, `ops history`, `ops undo`, and `ops redo`. A dev build also has `ops mode`.
 - `--json` and `--org <slug|name|me>` work on every command, anywhere on the line. So no command has its own `--org` or `--version` option: a section of the org is `ops section create <title> --org-wide`, and the version label of a deployment is `--version-label`.
 - With `--json`, stdout holds exactly one JSON document and nothing else. Most lists print a JSON array, and an empty one prints `[]`: `org list`, `member list`, `project list`, `deliverable list`, `section list` (no scope, `--deliverable`, `--deployment`), `task list`, `deadline list`, `plan list`, `deployment list`, `favourite list`, `notepad list`, `notify prefs list`. Some print an object; read the named field: `section list --project` → `project`, `deliverables[].sections`, `deployments[].sections`; `headers` → `projects`, `deliverables`, `sections`, `deployments` (each with `address`), and `owner` (the org text of each address); `route` → `orgSlug`, `op` (`route.suggest` or `route.candidates`: the op that answered), `model` (`jev` or `text`), `latencyMs`, `intent`, and `candidates[]` (`place {kind, id, title, path}`, `score`, `confidence` when the model gave one, `reason`, `address`); `search` → `items[]` (`kind`, `id`, `title`, `path`, `address`, `status`), `truncated`; `task search` → `results` (with `truncated`); `task subtask list` → `task` (the tree), `total`, `done`; `task map` → `task`, `root`, `subtree`, `home`, `groups`, `lineage`, `related`, `url`; `deployment inbox` → `section`, `tasks`; `deployment show` → `deployment`, `inbox`, `inboxTasks`, `shipsHere`, `startedHere`; `backlog show` → `section` and `tasks` (before the revamp: `folders[].tasks`); `comment list` → `items` (with `hasMore`); `notify list` and `activity list` → `page` (with `isDone`, `continueCursor`); `history` and `plan history` → `undo` and `redo`; `ops ops` → `ops`; `notepad show` → `{notepad, blocks, tasks, markdown}`; `day show` → `items` (with `date`, `doneCount`).
 - A write gives the new id and its `address`; a create of a task also gives `place` (`kind`, `id`, `title`, `path`, `address`) and `sectionId`; a create with `--route` also gives `routed` (`model`, `score`, `reason`, `candidates`); a move gives `to`, `moved[]`, and `movedIds` (the tasks and their subtrees). When the read of an address after a write fails, the result keeps the new id with `address: null` (exit 0), and stderr names the read to run again: do not run the write again.
@@ -32,7 +32,7 @@ Source: `apps/cli-ops` in the NUU monorepo (package `@nuucognition/ops-cli`). Th
 ## A first session for an agent
 
 ```bash
-ops whoami                                          # the user, the data mode, the active org
+ops whoami                                          # the user, the site, the active org
 ops headers --project Alpha                         # the places of a project, with addresses
 ops task context <task>                             # read a task before you work on it
 ops route "Fix the login bug on Safari"             # where a new task belongs
@@ -60,7 +60,7 @@ ops --version                          # the version of the package
 ```
 
 The package has one command, `ops`. It is the prod build: it ALWAYS uses
-prod data, and `OPS_DATA_MODE` has no effect. `ops-dev` exists only in the
+prod data, it has no data mode, and `OPS_DATA_MODE` has no effect. `ops-dev` exists only in the
 monorepo. The release procedure is `apps/cli-ops/RELEASE.md`
 (`bash apps/cli-ops/scripts/publish.sh --dry-run`, then without
 `--dry-run`; or the workflow "Publish ops CLI", or a tag
@@ -84,12 +84,13 @@ expect `ops-dev` on PATH outside the monorepo.
 
 ### Before the first write: which build and which data
 
-**The `ops` on PATH can be the prod build.** A prod build always uses prod
-data and ignores `OPS_DATA_MODE`: `OPS_DATA_MODE=dev ops task create …` with a
+**The `ops` on PATH can be the prod build.** A prod build has no data mode: it
+always uses prod data and ignores `OPS_DATA_MODE`: `OPS_DATA_MODE=dev ops task create …` with a
 prod build **writes to prod data**. So, before the first write:
 
-1. Run `ops mode` and read two lines: `build mode` (`prod` or `dev`) and
-   `data mode`. Write only when the data mode is the data that the work needs.
+1. Run `ops whoami` and read the row after `sign-in`. A prod build shows
+   `site`, and it uses prod data. A dev build shows `data mode`. Write only
+   when the data is the data that the work needs.
 2. Check that the build has the revamp: `ops --help` lists `headers`,
    `route`, `search`, and `section`. When it does not, the build is of before
    the revamp.
@@ -114,13 +115,14 @@ turns the check off.
 
 ## Modes
 
-`ops` follows the Strike rule. There are two modes, and they always move
-together:
+A prod build has no data mode (Task 426 of the NUU Operations Flint): it has
+no command `ops mode`, and its help, its output, and its hints name no data
+mode. A dev build follows the Strike rule. The two modes always move together:
 
 | | Build mode | Data mode |
 |---|---|---|
 | Says | which code runs | which deployment and which credential |
-| Prod build (`bin/ops-prod.js`, `dist/`) | prod | always prod |
+| Prod build (`bin/ops-prod.js`, `dist/`) | prod | none: always the prod deployment |
 | Dev build (`bin/ops.js`, `dist-dev/`, source) | dev | **prod by default** (Task 415); `OPS_DATA_MODE=dev` for dev data |
 
 | Data mode | Gateway site | Credential | Web links |
@@ -149,19 +151,20 @@ any more: `ops mode` prints a note while it is on disk. A prod build reads
 no variable and no file.
 
 ```bash
+# A dev build only: a prod build has no `ops mode`.
 ops mode                 # build mode, data mode and its source, site, credential file
-ops mode dev             # dev build only: write dev into the shared file (flint env use writes it too)
-ops mode prod            # dev build only: write prod into the shared file
+ops mode dev             # write dev into the shared file (flint env use writes it too)
+ops mode prod            # write prod into the shared file
 OPS_DATA_MODE=dev node apps/cli-ops/bin/ops.js whoami    # the dev launcher, dev data, this run only
 ```
 
 The line `data mode` of `ops mode` names the source: `dev  (env OPS_DATA_MODE)`,
-`prod  (default)`, `dev  (file)`, or `dev  (test)`. `ops mode prod` on a prod
-build refuses with `mode_fixed` (exit 2).
+`prod  (default)`, `dev  (file)`, or `dev  (test)`. On a prod build, `ops mode` is an
+unknown command (exit 2).
 
 ## Auth
 
-`ops` signs in with the nuu CLI credential of the data mode:
+`ops` signs in with the nuu CLI credential (a dev build: the credential of its data mode):
 `requireValidAuth(resolveEnv("ops", { mode: dataMode() }))`. A machine that
 ran `nuu login` (prod) or a dev nuu login (dev) needs no other step.
 `nuu login`, `flint login`, and `ops login` write the same prod credential,
@@ -174,8 +177,8 @@ token refreshes through the account service of that mode (dev:
 `http://localhost:3000`). The CLI never prints the token.
 
 ```bash
-ops login                # browser login for the current data mode
-ops whoami               # user, email, data mode, active org
+ops login                # browser login
+ops whoami               # user, email, sign-in, site, active org (a dev build: the data mode in place of the site)
 ```
 
 When the credential is missing or does not refresh, a command fails with
@@ -186,7 +189,7 @@ When the credential is missing or does not refresh, a command fails with
 Every command works in one org. The active org is:
 
 1. `--org <slug|name|me>` on the command line,
-2. else the stored default of the data mode (`~/.nuucognition/ops/<mode>.json`),
+2. else the stored default (`~/.nuucognition/ops/prod.json`; a dev build keeps one file for each data mode),
 3. else the personal workspace (its slug is your Clerk user ID).
 
 A command on an existing record (given by ID or URL) works in the record's
@@ -292,7 +295,7 @@ reads stdin.
 |---|---|
 | `ops login [--verbose]` | `ops login` |
 | `ops whoami` | `ops whoami --json` |
-| `ops mode [dev\|prod]` | `ops mode prod` |
+| `ops mode [dev\|prod]` — a dev build only | `ops mode prod` |
 | `ops ops [--area <area\|module>]` — the gateway manifest (no credential needed); `--area` matches the manifest area (`history`) or the op module (`waybill`) | `ops ops --area waybill` |
 | `ops call <op> [json\|-] [--query\|--mutation\|--action] [--inject-org]` — any allowlisted op; always prints JSON; the manifest gives the kind (`--action` is for `route.suggest`) | `ops call plans.listLite '{}' --inject-org` |
 
@@ -309,7 +312,7 @@ reads stdin.
 | Command | Example |
 |---|---|
 | `ops org list` — `*` marks the active org | `ops org list` |
-| `ops org use <slug\|name\|me>` — the default of this data mode | `ops org use "NUU Cognition"` |
+| `ops org use <slug\|name\|me>` — the stored default org | `ops org use "NUU Cognition"` |
 | `ops org show [org]` | `ops org show me` |
 | `ops member list` — members of the active org, for assignees | `ops member list --json` |
 
