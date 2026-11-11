@@ -23,7 +23,7 @@ This shard lets an agent work in the NUU Operations web app. The agent uses the 
 
 Load this shard when a request touches Operations records: projects, deliverables, sections, tasks and subtasks, task groups, review requests, the people looped into a task, backlogs, deployments and their inboxes, deadlines, blockers, plans and plan steps, Trident streams and workspaces, shares, holds, calendars and events, comments, notifications, activity, favourites, notepads, or the day planner.
 
-**Start here: [[dev-sk-ops-use_operations]].** It is the main skill of this shard. It gives the model, the builds and the sign-in, the org, references and places, the command for each job, `ops query` and `ops call` for any other read or write, ten recipes, the safety rules, and troubleshooting. Follow it for any Operations request. The other skills and workflows go deeper on one job.
+**Start here: [[dev-sk-ops-use_operations]].** It is the main skill of this shard. It gives the model, the builds and the sign-in, the org, references and places, the command for each job, `ops query` and `ops call` for any other read or write, sixteen recipes, the safety rules, and troubleshooting. Follow it for any Operations request. The other skills and workflows go deeper on one job.
 
 For the task primitive of Task 1287 (the close and the result, lineage, task groups, attachments) the Tasks shard has the depth: `flint shard start task`, then [[knw-task-cli]] and [[knw-task-model]].
 
@@ -43,6 +43,7 @@ Operations (Ops) is the delivery record of a person and of an organisation. The 
 12. A **share** gives another org or one person access to one record (`reader` or `editor`).
 9. **Blockers** say why work waits: what it waits on, the next step, an owner, and the next check-up date. A blocker links records and gates no status. It is open, resolved, or dropped.
 10. A task has no type, no stage, and no outcome: its state is its status and its result. The people **looped in** follow a task beside its owner and hear every comment. A **task group** is a set of tasks that are done together. A **day plan** is the ordered tasks of one person for one date.
+13. An **agent session** is at an Ops object (a task, a section, a deliverable, or a project) when it keeps that object as an item (`flint orbh objects add <address> --subscribe`). Its current object is its newest Ops item. A project and a deliverable hold the **agent defaults** of a new agent session: the Flint, the computer, the site, the profile, and the mode.
 
 ```
 org
@@ -84,6 +85,8 @@ The service derives some states. A section is done when all its root tasks are d
 | Share a record with another org or a person | `ops share list|add|permission|remove <…>`, `ops share with` |
 | See who holds a task | `ops task holds <task>` |
 | Put a meeting, a day, or a period on a calendar | `ops calendar list|create|default`, `ops event create <title> (--start … --end … \| --date <day> [--until <day>])`, `ops event list --from today --days 7` |
+| See the agent sessions at Ops objects now | `ops agents [--computer <name>] [--all]` |
+| Read or set the agent defaults of a place | `ops agents defaults <ref>`, `ops agents defaults set <project or deliverable> [--flint] [--computer] [--site] [--profile] [--mode]` (ask the operator first) |
 | Answer a question that no command answers | `ops query <table> --where <field><op><value>` (see [[dev-sk-ops-use_operations]] § 7) |
 | Run an op that no command has | `ops ops`, then `ops call <op> '<json>'` |
 
@@ -173,7 +176,7 @@ Every command that shows a task or a place prints its web link or its address. T
 
 Read [[dev-knw-ops-cli]] for every command, flag, and error code. The essentials:
 
-- Most commands are `ops <noun> <verb>`: `org`, `member`, `project`, `deliverable`, `section`, `task`, `deployment`, `comment`, `backlog`, `deadline`, `blocker`, `plan`, `step`, `stream`, `workspace`, `share`, `calendar`, `event`, `review`, `notify`, `activity`, `favourite`, `notepad`, `day`, `people`, `home`, `address`, `query`. These have no noun: `ops login`, `ops whoami`, `ops ops`, `ops call`, `ops headers`, `ops route`, `ops search`, `ops history`, `ops undo`, and `ops redo`. A dev build also has `ops mode`. `ops day-label` is gone (Task 390): a day label is an all-day event now (`ops event create <title> --date <day> [--until <day>]`). `ops <noun> <verb> --help` shows the arguments, the options, and examples. A noun with no verb (`ops task`) is a usage error that lists the verbs. The former words still work and are hidden: `ops subsection` and `--subsection`. `ops folder` is gone (0.1.0-dev.3).
+- Most commands are `ops <noun> <verb>`: `org`, `member`, `project`, `deliverable`, `section`, `task`, `deployment`, `comment`, `backlog`, `deadline`, `blocker`, `plan`, `step`, `stream`, `workspace`, `share`, `calendar`, `event`, `review`, `agents`, `notify`, `activity`, `favourite`, `notepad`, `day`, `people`, `home`, `address`, `query`. These have no noun: `ops login`, `ops whoami`, `ops ops`, `ops call`, `ops headers`, `ops route`, `ops search`, `ops history`, `ops undo`, and `ops redo`. A dev build also has `ops mode`. `ops day-label` is gone (Task 390): a day label is an all-day event now (`ops event create <title> --date <day> [--until <day>]`). `ops <noun> <verb> --help` shows the arguments, the options, and examples. A noun with no verb (`ops task`) is a usage error that lists the verbs. The former words still work and are hidden: `ops subsection` and `--subsection`. `ops folder` is gone (0.1.0-dev.3).
 - A record argument takes an ID, an address, a web URL, a title, or a path (`"Alpha › v1 › Backend"`). A title that matches more than one record fails with `<kind>_ambiguous` (exit 2) and lists the candidates with their paths. Run the command again with the ID or the address. Never guess.
 - A place of `ops task move --to` is `section:<ref>`, `project:<ref>` (its backlog), `deliverable:<ref>` (its main section: the named section of the deliverable), `deployment:<ref>` (its inbox), `parent:<task>` (a subtask), `backlog`, `master`, or `unplaced`. A move takes the subtree.
 - Every line that shows a record ends with its address, and `--json` has an `address` field. Keep it for the next command.
@@ -207,7 +210,7 @@ When the work of a session belongs to one Operations task, follow the Strike wor
 The workflow lives in the Strike shard because the Strike bind installs that shard into every bound Flint, and this source is local to one Flint. It obeys the Safety Rules above, and it adds three rules:
 
 - It writes only to the linked task: `ops task start`, `ops comment add`, and `ops task done` (after the operator confirms).
-- It posts one update at each meaningful point (start, blocker, review stop, done), and no other comment.
+- It posts one update at each meaningful point (start, blocker, review stop, done), and no other comment. An answer to a comment of a person is not an extra update: answer each one as a comment (§ Agent Sessions at Ops Objects).
 - Each update names the place of the work (the Flint, the Mesh task, the commits) and the place of the task (project, deliverable, section). Its last line is the agent signature line: `_An agent wrote this comment through the ops CLI (Orbh session <session id>)._`
 
 ## Sessions Started From the Web App
@@ -215,6 +218,22 @@ The workflow lives in the Strike shard because the Strike bind installs that sha
 A person can start an agent session in a Flint of a computer from a task in the web app: the page Computers, or "Start session" in the task dialog (Task 1157 of the NUU Flint, on dev data first). The web app sends the action `session.start` through NUU Network to that computer and Flint, with the profile and the account that the person picked. The session runs headless in that Flint, with the title `Ops: <task title>`.
 
 The session gets the task context in its prompt: the task title, the link of the task, the task id with its org and data mode, the command `ops task context <task> --org <org>`, the command `ops comment add <task> "<update>" --org <org>`, and the description of the task. So the work of that session belongs to that task: follow "Work Tied To An Operations Task", and read `ops task context` first. The web app records the launch on the task (the computer, the Flint, the target, the account, the request id, the session id) with a hash of the prompt, not the prompt text. The shard Network Access (`nax`, in the NUU Flint) teaches how an app does this.
+
+## Agent Sessions at Ops Objects
+
+A person can start an agent session at an Ops object, or attach a session that runs: a task, a section, a deliverable, or a project. The session keeps the object as an item (`flint orbh objects add <address> --subscribe`), and it works on the object for the person who attached it. The addresses: `@v1/<org>/task/<id>#ops`, `@v1/<org>/section/<id>#ops`, `@v1/<org>/deliverable/<id>#ops`, and `@v1/<org>/project/<id>#ops`. The page Agents of Ops and `ops agents` list the sessions at Ops objects now.
+
+The duty of the session, at each of the four types:
+
+1. **Keep the object in the objects.** Do not remove the item while the work goes on.
+2. **Answer a person first.** A person message has priority over the other work. Answer it before you continue, in the place where the person wrote. A person speaks to the agent session in two equal ways:
+   - A **comment** on a task (only a task carries comments). Read it with `ops comment list <task>`. Answer with `ops comment add <task> "<text>"`.
+   - A message in **the chat** of the session (Orbh Chat), at any of the four types. The Page shows the unread chat first, in the block `CHAT`. Read it with `flint orbh chat read`. Answer with `flint orbh chat send "<text>"`.
+3. **Read each change.** A change of the object reaches the session as an event: a message of `orbh:objects` (a push, not a timed check). The session gets no message for its own write. When the object changed, read it again (`ops task context <task>`, or `ops <noun> show <ref>`) and read the new comments of a task (`ops comment list <task>`).
+4. **Do the changes of a review.** When the reviewer of a task asks for changes, do them. Then write the result again (`ops task result <task> "<text>"`), and request the review again (`ops task review request <task> --note "<what changed>" --json`).
+5. **Post progress as short comments** on a task: `ops comment add <task> "<one line>"`. At a section, a deliverable, or a project, post progress in the chat.
+
+**The agent defaults** (D19). The launcher of a new agent session derives its defaults: from the object (a task), then its section, deliverable, project, and org, then the last choice of the person. A project and a deliverable hold them: the Flint (their Flint place), the computer (its name), the site (`@v1/<org>/site/<site id>#<computer>`), the profile (`runtime/profile`), and the mode (`headless`, `interactive`, or `obsidian`). Each value comes from the nearest level: the Flint task note of a task, then the deliverable, then the project. `ops agents defaults <ref>` shows each value with its source. `ops agents defaults set <project or deliverable> …` sets them, and `none` clears a value. Set the agent defaults only when the operator asks. The model is in [[dev-knw-ops-data_model]] § Agent Sessions at Ops Objects and § Agent Defaults.
 
 ## Rules
 
@@ -253,6 +272,7 @@ These rules replace every "ask the operator" step of the interactive rules.
 8. **Network errors (exit 4).** Retry a read once. Before you repeat a write, read the record or the list it would change, and check whether the write landed: a network error can come after the commit, and the CLI sends no idempotency key. Never repeat a create or a comment without that check. When you cannot tell whether a write landed, do not repeat it: report the command, the record, and the uncertain state in the result. This rule also applies to `bad_response` and response-body read failures, which can return exit 1. Check the affected records before any retry. If the result is unclear, report it and do not repeat the write.
 9. **Ambiguous references.** On `<kind>_ambiguous` (exit 2), choose the candidate only when the prompt makes the choice clear. Else report the candidates with their IDs, and do not write.
 10. **Access and moves.** Share a record, change or remove a share, move a deliverable to another project, or dismiss all notifications only when the prompt asks for it. A share gives another org or a person access to the record and the records inside it.
+11. **A person message comes first.** When the session is at an Ops object, answer each comment and each chat message of a person in its place before you return (§ Agent Sessions at Ops Objects). A session that a person started or attached from Ops can return with `--await`: a new comment (with `--subscribe`) or a chat message then wakes it. Set the agent defaults (`ops agents defaults set`) only when the prompt asks for it.
 
 ## Workflows in a Headless Session
 

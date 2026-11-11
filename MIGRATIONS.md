@@ -2,6 +2,12 @@
 
 Migration notes for Operations. Latest version at top, separated by `---`.
 
+## 0.7.0
+
+No migration of the Flint. The shard installs nothing into the Mesh. The release adds text only. The fields `flintId`, `flintAddress`, and `agentDefaults` of a project, and `agentDefaults` of a deliverable, are optional: an old row needs no migration.
+
+---
+
 ## 0.6.0
 
 No migration of the Flint. The shard installs nothing into the Mesh.

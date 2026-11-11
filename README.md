@@ -6,6 +6,8 @@ The source moved from the NUU Operations Flint to the NUU Flint on 2026-10-21 (o
 
 Version 0.3.0 (ops-cli-publish-1023) adds the main skill `sk-ops-use_operations`: an agent with no other context can do Operations work with it.
 
+Version 0.7.0 (total-orchestration-1111) adds agent sessions at Ops objects: the duty of an agent session at a task, a section, a deliverable, or a project, the two ways to speak to it (a comment on a task, or the chat), `ops agents`, and the agent defaults (`ops agents defaults` and `ops agents defaults set`).
+
 Version 0.6.0 (ops-overnight-1109) adds Trident (streams, stream steps, substreams, drawings, and workspaces), shares, holds, calendars and events, the deliverable move, the locked section with the name of its home, and subtasks of one level. It removes `ops section priority` and `ops task subtask indent`, and it gives the data mode of Task 415 (a dev build uses PROD data by default).
 
 The shard teaches an agent the Operations data model, the plan canvas rules, the `ops` CLI, four workflows, and six skills. It owns no Mesh type and installs nothing into the Mesh. It comes from (Task) 297. (Task) 309 added `ops task context`. (Task) 320 made the CLI help, output, errors, and flags consistent and added `ops history`, `ops undo`, and `ops redo`; (Task) 327 brought this shard up to date with it, and with the review fixes and the `ops favourite` commands of (Task) 320.

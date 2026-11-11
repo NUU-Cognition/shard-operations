@@ -1,5 +1,5 @@
 ---
-description: "Complete reference for the ops CLI after the revamp of ops-command-1021 — the model, a first session, install, modes, sign-in, the default org, references (IDs, addresses, URLs, titles, paths), places of --to, output and exit codes, every command family (headers, route, search, section, task with subtasks and the map, deliverable done, deployments and the inbox, blockers, notepads, the day plan, Trident streams and workspaces, shares, holds, calendars and events), the read query (ops query), ops call, ops ops, and the undo guard"
+description: "Complete reference for the ops CLI after the revamp of ops-command-1021 — the model, a first session, install, modes, sign-in, the default org, references (IDs, addresses, URLs, titles, paths), places of --to, output and exit codes, every command family (headers, route, search, section, task with subtasks and the map, deliverable done, deployments and the inbox, blockers, notepads, the day plan, Trident streams and workspaces, shares, holds, calendars and events, agent sessions at Ops objects and the agent defaults), the read query (ops query), ops call, ops ops, and the undo guard"
 orbh-sessions:
   - "[[3fb6e594-a179-4c0b-ba67-833b2ccaea67]]"
   - "[[4c4eadb7-6e8e-4529-8186-3bb1b5bdbc75]]"
@@ -901,6 +901,125 @@ address, or a web URL. A `<shareId>` is the ID of one access line (from
 | `ops share permission <shareId> <reader\|editor>` — `shares.setPermission` | `ops share permission <shareId> reader` |
 | `ops share remove <shareId>` — `shares.unshare`; it sends no notice | `ops share remove <shareId>` |
 | `ops share with` — `shares.sharedWith`: the records that other orgs shared with the active workspace (`--org` picks the workspace) | `ops share with --org me` |
+
+### agents
+
+An agent session is at an Ops object (a task, a section, a deliverable, or
+a project) when it keeps that object as an item (`flint orbh objects add
+<address> --subscribe`). Its current object is its newest Ops item. `ops
+agents` reads the sessions from NUU Network with the read of the page
+Agents (`live:objects`): a plain HTTP call with the sign-in of the CLI. So
+it shows what the page shows, and only the computers that you can see. In a
+team org it sends the org; in the personal workspace it sends no org. A
+refused sign-in prints one line with the step and exits 3
+(`network_sign_in`). The agent defaults are the ops `agentSessions.defaults`
+(a query) and `agentSessions.setDefaults` (a mutation) of the gateway
+([[dev-knw-ops-data_model]] § Agent Defaults). A deployment that does not
+have them yet gives `agent_unknown_operation`.
+
+| Command | Example |
+|---|---|
+| `ops agents [list] [--computer <name>] [--all]` — the verdict line (`3 agents work in <org>`, or `3 agents work at Ops objects` in the personal workspace), then one line for each session, the working sessions first: the work state, the session, `computer · Flint`, the type and the title of the current object, and its address; `--all` prints each object of each session; `--json`: `{objects, cut}` as the network gave them (`cut`: more than 500 objects exist) | `ops agents --computer katana` |
+| `ops agents defaults <ref>` — one line for each field with a value and its source (`flint  @v1/nuucognition/flint/nuu-operations  from the deliverable "Ops Agents"`); no value: `No default is set for <title>.` and a `next:` line with the set command; `--json`: the answer of the op | `ops agents defaults <taskId>` |
+| `ops agents defaults set <ref> [--flint] [--flint-id] [--computer] [--site] [--profile] [--mode]` — a project or a deliverable only (a task or a section: a usage error with the `next:` line of its deliverable or project); only the given fields change; `none` clears a field; no flag is a usage error; the computer goes as `{ name }`; it prints the done line, then the stored values; `--json`: `{kind, id, defaults}` | `ops agents defaults set <projectId> --profile claude/o55xh --mode headless` |
+
+`ops deliverable flint set` and `clear` write the same Flint field as
+`--flint` and `--flint-id`.
+
+The help of each verb:
+
+```text
+$ ops agents --help
+Usage: ops agents [options] [command]
+
+Read the agent sessions at Ops objects: the list of the page Agents, and the
+agent defaults
+
+Options:
+  -h, --help      Show the help of this command
+
+Commands:
+  list [options]  List the agent sessions at Ops objects now, as the page
+                  Agents shows them (the default verb of ops agents)
+  defaults <ref>  Show the agent defaults of a task, a section, a deliverable,
+                  or a project: each value with the level that gives it
+  help [command]  Show the help of a command
+
+Examples:
+  ops agents
+  ops agents defaults <taskId>
+  ops agents defaults set <projectId> --profile claude/o55xh
+
+$ ops agents list --help
+Usage: ops agents list [options]
+
+List the agent sessions at Ops objects now, as the page Agents shows them (the
+default verb of ops agents)
+
+Options:
+  --computer <name>  Only the sessions of one computer (the computer name, for
+                     example katana)
+  --all              Print each object of each session, not only the current
+                     object
+  -h, --help         Show the help of this command
+
+Examples:
+  ops agents
+  ops agents --computer katana
+  ops agents list --all --json
+
+$ ops agents defaults --help
+Usage: ops agents defaults [options] [command] <ref>
+
+Show the agent defaults of a task, a section, a deliverable, or a project: each
+value with the level that gives it
+
+Arguments:
+  ref                  A task, section, deliverable, or project: an ID, an
+                       address, a web URL, or <kind>:<title> (deliverable:"Ops
+                       Agents")
+
+Options:
+  -h, --help           Show the help of this command
+
+Commands:
+  set [options] <ref>  Set the agent defaults of a project or a deliverable
+                       (none clears a value)
+
+Examples:
+  ops agents defaults <taskId>
+  ops agents defaults deliverable:"Ops Agents" --json
+
+$ ops agents defaults set --help
+Usage: ops agents defaults set [options] <ref>
+
+Set the agent defaults of a project or a deliverable (none clears a value)
+
+Arguments:
+  ref                          A project or a deliverable: an ID, an address, a
+                               web URL, or <kind>:<title>
+
+Options:
+  --flint <address>            The default Flint: its address
+                               @v1/<org>/flint/<slug> (the Flint place of the
+                               record)
+  --flint-id <uuid>            The Flint id (the id in flint.json)
+  --computer <name>            The default computer: its name (the word after #
+                               in an address, for example katana)
+  --site <address>             The default site: its address
+                               @v1/<org>/site/<site id>#<computer>
+  --profile <runtime/profile>  The default profile, for example claude/o55xh
+  --mode <mode>                The default mode: headless, interactive,
+                               obsidian
+  -h, --help                   Show the help of this command
+
+Examples:
+  ops agents defaults set deliverable:"Ops Agents" --flint @v1/nuucognition/flint/nuu-operations --computer katana
+  ops agents defaults set <projectId> --profile claude/o55xh --mode headless
+  ops agents defaults set <projectId> --site none
+```
+
+The global options `--json` and `--org <org>` work on each verb.
 
 ### calendar
 

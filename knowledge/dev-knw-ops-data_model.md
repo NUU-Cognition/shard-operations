@@ -1,5 +1,5 @@
 ---
-description: "The NUU Operations data model — the places (org, project, deliverable, section, deployment), tasks and subtasks, the task primitive, the task map, the blockers, the hidden context, the headers, the route decision, the addresses, Trident streams and workspaces, shares, holds, calendars and events, the named sections, every field as the backend names it, the rules of each mutation, undo and Waybill, and the error codes"
+description: "The NUU Operations data model — the places (org, project, deliverable, section, deployment), tasks and subtasks, the task primitive, the task map, the blockers, the hidden context, the headers, the route decision, the addresses, Trident streams and workspaces, shares, holds, calendars and events, agent sessions at Ops objects and the agent defaults, the named sections, every field as the backend names it, the rules of each mutation, undo and Waybill, and the error codes"
 orbh-sessions:
   - "[[3fb6e594-a179-4c0b-ba67-833b2ccaea67]]"
   - "[[4c4eadb7-6e8e-4529-8186-3bb1b5bdbc75]]"
@@ -34,6 +34,7 @@ Org (orgSlug)
   ├── Calendars ── events (timed, all-day, periods) ── links to tasks and deadlines
   ├── Shares (a project, a deliverable, or a task, to another org or one person)
   ├── Holds (a lease of an actor on a task or a project)
+  ├── Agent sessions at Ops objects (on NUU Network), agent defaults of projects and deliverables
   └── Activity (Waybill), Notifications, Comments on tasks
 ```
 
@@ -134,6 +135,8 @@ Table `projects`. Module `projects`.
 | `nextUpdate` | ISO date string, optional | Only for `kind: "project"`. `create` drops it for an operation. |
 | `context` | Markdown, optional | The hidden context. See § Hidden Context. |
 | `originDeploymentId` | `Id<"deployments">`, optional | The deployment the project ships to. It must be in the org and owned (`deployment_not_found`, `deployment_not_owned`). |
+| `flintId`, `flintAddress` | string, optional | The Flint place of the project: the default Flint of an agent session that starts there (Task 448, § Agent Defaults) |
+| `agentDefaults` | object, optional | The other agent defaults: `computer {id?, name}`, `site`, `profile`, `mode` (§ Agent Defaults) |
 | `createdBy` | `Id<"users">` | |
 
 | Op | Args |
@@ -277,7 +280,8 @@ Table `deliverables`. Module `deliverables`.
 | `deploymentId` | `Id<"deployments">`, optional | The deployment that the deliverable ships to. Index `by_deployment`. |
 | `fromDeploymentId` | `Id<"deployments">`, optional | The deployment inbox that the deliverable comes from |
 | `context` | Markdown, optional | The hidden context, at most 20 000 characters |
-| `flintId`, `flintAddress` | string, optional | The one Flint place of the deliverable. Strike binds a deliverable to a Flint with it. |
+| `flintId`, `flintAddress` | string, optional | The one Flint place of the deliverable. Strike binds a deliverable to a Flint with it. It is also the default Flint of an agent session that starts there (§ Agent Defaults). |
+| `agentDefaults` | object, optional | The other agent defaults: `computer {id?, name}`, `site`, `profile`, `mode` (§ Agent Defaults) |
 | `ownerUserId` | `Id<"users">`, optional | No public op sets it |
 | `status`, `summary`, `dueDate` | deprecated | Never read or written. The status is derived. |
 
@@ -1009,6 +1013,60 @@ Table `entity_holds` (the log: `entity_hold_log`). Module `holds`. A hold is a l
 
 Codes of a hold: `held`, `not-holder`, `no-hold`, `bad-request`, `not-supported`.
 
+## Agent Sessions at Ops Objects
+
+An agent session (an Orbh session) is **at** an Ops object when it keeps that object as an item of the Objects Protocol (`flint orbh objects add <address> --subscribe`). Four Ops types are objects that a session can keep:
+
+| Type | Address |
+|------|---------|
+| Task | `@v1/<org>/task/<id>#ops` |
+| Section | `@v1/<org>/section/<id>#ops` |
+| Deliverable | `@v1/<org>/deliverable/<id>#ops` |
+| Project | `@v1/<org>/project/<id>#ops` |
+
+- **The current object** of a session is its newest Ops item (`addedAt`). A session can be at more than one object (D5).
+- **The read.** NUU Network holds the items of the live sessions. Its read `live:objects` (args `{app: "ops", org?, computer?}`) gives one row for each item, with the session, the Flint, and the computer, and `cut` when more than 500 rows exist. The page Agents of Ops and `ops agents` use this read. In the personal workspace the read has no org.
+- **Permissions** (D27). A person sees a session, its timeline, and its chat only with `view` on its computer. Ops never shows data of a computer that the person cannot see.
+- **Events.** A change of an Ops object reaches each session that subscribes to it as a message of `orbh:objects` (a push, not a timed check). A session gets no message for its own write.
+
+**The duty of an agent session at an Ops object.** The session works on the object for the person who attached it:
+
+1. It keeps the object in its objects.
+2. It answers a person first, in the place where the person wrote (D17).
+3. When `orbh:objects` says that the object changed, it reads the new updates.
+4. When a review asks for changes, it does them, writes the result again, and requests the review again.
+5. It posts progress as short comments (on a task).
+
+**Two equal ways to speak to an agent session.** Only a task carries comments. At a section, a deliverable, or a project, a person speaks in the chat.
+
+| Way | Where | The session reads | The session answers |
+|-----|-------|-------------------|---------------------|
+| Comment | The updates of a task (`updates.*`) | `ops comment list <task>`, after a message of `orbh:objects` | `ops comment add <task> "<text>"` |
+| The chat | Orbh Chat: one conversation for each session, between the people who can `run` it and the session (D15) | The block `CHAT` of the Page (the unread chat, first), or `flint orbh chat read` | `flint orbh chat send "<text>"` |
+
+A person message has priority over the other work: the session answers it before it continues. The chat verbs are `flint orbh chat send "<text>"`, `flint orbh chat read`, and `flint orbh chat on|off` (W13).
+
+## Agent Defaults
+
+The launcher of an agent session derives its defaults (D19). The order: the object (a task), then its section, its deliverable, its project, and its org, then the last choice of the person. A project and a deliverable hold the agent defaults. A section and an org store none: the read passes them.
+
+| Field | Where it is stored | Value |
+|-------|--------------------|-------|
+| `flint` | `flintAddress` (with `flintId`) of the project or the deliverable: its Flint place | A Flint address `@v1/<org>/flint/<slug>` |
+| `computer` | `agentDefaults.computer` | `{id?, name}`: the computer id of NUU Network (the launcher matches by it) and its name (the word after `#` in an address, for example `katana`) |
+| `site` | `agentDefaults.site` | The v1 address of a site: `@v1/<org>/site/<site id>#<computer>` |
+| `profile` | `agentDefaults.profile` | `runtime/profile`, for example `claude/o55xh` |
+| `mode` | `agentDefaults.mode` | `headless`, `interactive`, or `obsidian` |
+
+Each field resolves alone: the nearest level that has a value wins. The levels, from near to far: the task (only the Flint, from its Flint task note; a subtask reads its root task), then the deliverable, then the project.
+
+| Op | Args | Notes |
+|----|------|-------|
+| `agentSessions.defaults` (query) | `orgSlug, target?: {kind: "task" \| "section" \| "deliverable" \| "project", id}` | Each field `{value, from: {kind, id, title}}`; `flint` also has `flintId?`, `site` also has `id?` (the site id). No target gives `{}`. A target that the person cannot read gives `agent_session_not_found`. `ops agents defaults <ref>`. |
+| `agentSessions.setDefaults` (mutation) | `orgSlug, target: {kind: "project" \| "deliverable", id}, defaults: {flint?, flintId?, computer?, site?, profile?, mode?}` | Each value is a string (the computer: `{id?, name}`) or `null`. An absent key changes nothing, and `null` clears the field. The Flint follows the rule of `deliverables.setFlintPlace`. A bad value refuses with `agent_defaults_invalid`. It gives the own stored values of the row. The label is `project.edit` or `deliverable.edit` (`context.field: "agentDefaults"`). `ops agents defaults set <ref>`. |
+
+`ops deliverable flint set` and `clear` write the same Flint field.
+
 ## Calendars and Events
 
 Module `calendar`. Tables `calendars`, `calendar_defaults`, `calendar_events`, `calendar_event_links`.
@@ -1468,4 +1526,6 @@ The gateway returns `{ok: false, error: {code, message, data?}}`. The codes belo
 | `day_plan_reorder_invalid` | The plan changed, or the order is not the exact set | Read the plan again (`dayPlans.get`) |
 | `blocker_not_found`, `blocker_closed`, `blocker_check_invalid`, `blocker_link_not_found`, `blocker_title_required`, `blocker_text_too_long` | A blocker refusal (§ Blockers) | Check the ID, the state (`delay`, `resolve`, `drop` need an open blocker), the date (`YYYY-MM-DD`), the record, the text length |
 | `blocked_reason_required`, `blocked_too_long` | The old `blocked` argument of `tasks.update` with no reason, or a long text | Give a reason; prefer `blockers.create` |
+| `agent_defaults_invalid` | A bad value of `agentSessions.setDefaults` (a Flint, a computer, a site, a profile, or a mode) | Read the message, fix the value (§ Agent Defaults), and send it again |
+| `agent_session_not_found` | The target of `agentSessions.defaults` or `setDefaults` is missing, in another org, or not readable | Check the ref and the org |
 | `network_launch_*` | `taskLaunches.accept` refused (for example `network_launch_stale`, `network_launch_already_accepted`, `network_launch_text_mismatch`) | Only the station workflow calls it; report the code |

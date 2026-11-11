@@ -1,5 +1,5 @@
 ---
-description: "The main skill of Operations: what Ops is, the model (with Trident streams, shares, holds, calendars, and events), the two modes and the sign-in, the org, references and places, --json and the error codes, the command for each job, ops query and ops call for any other read or write, fifteen recipes, the safety rules, and troubleshooting"
+description: "The main skill of Operations: what Ops is, the model (with Trident streams, shares, holds, calendars, events, and agent sessions at Ops objects), the two modes and the sign-in, the org, references and places, --json and the error codes, the command for each job, ops query and ops call for any other read or write, sixteen recipes, the safety rules, and troubleshooting"
 orb:
   - "@v1/nuucognition/session/9297d2a3-64c8-4d33-8c4c-76011ebae793#flint/nuu-operations"
   - "@v1/nuucognition/session/ce8895db-085b-4ef7-a9da-53395fff62a3#flint/nuu-operations"
@@ -51,7 +51,9 @@ The model:
 | **Deadline** | A dated record in a graph: it attaches to records, it can require other deadlines, and it has assignees. | `ops deadline …` |
 | **Blocker** | Why work waits: a title, what it waits on, the next step, an owner, and the next check-up date. It links records and gates no status. Open, resolved, or dropped. | `ops blocker …` |
 | **Notepad** | Markdown text with task mentions (`[[task:<id>\|<title>]]`). General (the org sees it) or personal. | `ops notepad …` |
-| **Comment** | A post on the Updates timeline of a task. | `ops comment …` |
+| **Comment** | A post on the Updates timeline of a task. Only a task carries comments. | `ops comment …` |
+| **Agent session** | An Orbh session at an Ops object (a task, a section, a deliverable, or a project): it keeps the object as an item (`flint orbh objects add <address> --subscribe`). Its current object is its newest Ops item. It works for the person who attached it. A person speaks to it with a comment on a task, or in the chat of the session (Orbh Chat). | `ops agents` |
+| **Agent defaults** | The Flint, the computer, the site, the profile (`runtime/profile`), and the mode of a new agent session. A project and a deliverable hold them. Each value comes from the nearest level: the Flint task note of a task, then the deliverable, then the project. | `ops agents defaults <ref>`, `ops agents defaults set <project or deliverable>` |
 | **Day plan** | Your own ordered list of tasks for one date. Personal only. | `ops day …` |
 | **Calendar and event** | A calendar is a named, coloured set of events; one is your default. An event is timed, all-day, or a **period** (an all-day event of more than one day). It can repeat, and it can attach to a task or a deadline. | `ops calendar …`, `ops event …` |
 | **Share** | Access to one record (a task, a project, a deliverable) for another org or one person, as `reader` or `editor`. | `ops share …` |
@@ -129,6 +131,7 @@ Use the first command that fits. `ops <noun> <verb> --help` gives the flags and 
 | **Move** and order | `ops task move <tasks...> --to <place>`, `ops task reorder <task> --before\|--after <t>`, `ops section move\|reorder`, `ops deliverable move <d> --to <project>`, `ops task subtask …` ([[dev-sk-ops-move_tasks]]) |
 | **Group** and link tasks | `ops task group create\|add\|remove\|update` (`--json` of `create` and `update` gives `groupId`, not `id`); lineage: `ops task continue` (makes a NEW task), `ops task link <task> <previous>` (links two tasks that exist as continues-from, closes nothing), `ops task unlink <task> [--kind after]`, `ops task chain\|unchain` (the `after` links), `ops task split\|merge`; `ops task relate\|attach` |
 | **Tie an agent session** to tasks | `ops task session-state <session-id> <state>` (the state on every attachment of the session); a station workflow: `ops task launch accept <launch-id> --station <address> --machine-id <id> --text-file <path>` before any work, then work only on the task and org that it returns |
+| **See the agents** at Ops objects | `ops agents [--computer <name>] [--all]` (the list of the page Agents: one line for each session, the working sessions first), `ops agents defaults <ref>` (the agent defaults of a task, a section, a deliverable, or a project, each value with its source), `ops agents defaults set <project or deliverable> [--flint <address>] [--flint-id <uuid>] [--computer <name>] [--site <address>] [--profile <runtime/profile>] [--mode headless\|interactive\|obsidian]` (`none` clears a value) |
 | **Plan** work | `ops plan create\|show`, `ops step add\|move\|requires\|links` ([[dev-wkfl-ops-plan_layout]], [[dev-knw-ops-canvas]]); a deliverable with sections: [[dev-sk-ops-plan_deliverable]] |
 | **Run a lane** (Trident) | `ops stream list\|show\|create\|update\|delete\|attach\|detach\|size\|history\|undo\|redo`, `ops stream step add\|add-task\|create-task\|move\|park\|unpark\|shore\|unshore\|cross\|substream`, `ops stream substream create\|rename\|park\|unpark\|place\|ungroup`, `ops stream drawing list\|add\|text\|move\|remove`, `ops workspace list\|show\|create\|update\|streams\|reorder\|delete` |
 | **Change a step** (plan or stream) | `ops step split <step> [--before]`, `ops step split-beside <step>`, `ops step state <planned\|active\|done> <steps...>`, `ops step done-next <step>`, `ops step move-links --link <from>:<to> --end from\|to --target <step>`, `ops step remove-links <from>:<to>`, `ops step place <step> --x --y`; a stream step title needs `--stream <stream>` |
@@ -272,6 +275,15 @@ Each recipe uses `--org <org>` when the org is not the active one. Use `--json` 
     ops task review request <task> --note "<the summary, the commits, and what to check>" --json
     ```
     With no `--to`, the reviewer is the owner of the task. A team task with no owner refuses with `review_no_reviewer`: give `--to <member>` (or `--to me`). Ask before a close: a close cancels the open requests.
+16. **Work as an agent session at an Ops object.**
+    ```bash
+    flint orbh objects add <address> --subscribe   # keep the object (task, section, deliverable, or project) in the session
+    ops comment list <task>                        # a task changed (a message of orbh:objects): read the new updates
+    ops comment add <task> "<answer>"              # answer a comment as a comment; post progress as short comments
+    flint orbh chat read                           # the chat: the unread messages (the Page shows them first, in the block CHAT)
+    flint orbh chat send "<answer>"                # answer a chat message in the chat
+    ```
+    A person message has priority over the other work: answer it before you continue, in the place where the person wrote. A person speaks with a comment only at a task. At a section, a deliverable, or a project, the person speaks in the chat. A change of the object reaches the session as an event (a push), not a timed check, and the session gets no message for its own write. When a review asks for changes, do them, write the result again (`ops task result`), and request the review again (`ops task review request`).
 
 # Safety Rules
 
@@ -279,7 +291,7 @@ Each recipe uses `--org <org>` when the org is not the active one. Use `--json` 
 2. **Act as the operator.** Each write is the operator's own write; Waybill records the operator as the actor, with the agent mark. Change only the records that the request names, in the org that it names.
 3. **Read before a delete.** A delete of a project or a deliverable (and of a deployment) needs an org owner or admin (`owner-only`). An agent that is a member archives a project (`ops project update <p> --status archived`), retires a deployment (`ops deployment status <d> retired`), and marks a deliverable done after the operator confirms. A delete can cascade: a project takes its deliverables, sections, and tasks; a deliverable takes its sections and tasks; a section takes its tasks; a plan takes its steps. The CLI refuses these deletes without `--yes` (`confirm_required`, exit 2): project, deliverable, section, deployment, plan, blocker, and calendar (a calendar takes its events). `ops task delete` and `ops notepad delete` take no `--yes`: read first. A task with subtasks needs `--with-subtasks`. Tell the operator what goes, and add `--yes` only after the operator confirms.
 4. **Undo only what you read.** Undo replays your last gesture in a scope, and that gesture can be one that the operator made in the web app. Read `ops history` first and pass `--expect <seq>`. The CLI refuses an undo or a redo without `--expect` (`expect_required`) unless you pass `--dry-run`. A blocker write is a Waybill gesture in the scope `org:<org>`: use `ops history --scope org:<org>` and `ops undo --scope org:<org> --expect <seq>`. A comment delete and a blocker delete cannot be undone: resolve or drop a blocker instead of a delete.
-5. **Respect what a person decides.** Do not mark a deliverable done, mark all notifications read, dismiss all notifications (`ops notify dismiss-all`), share a record, remove a share, or move a deliverable to another project unless the operator asks.
+5. **Respect what a person decides.** Do not mark a deliverable done, mark all notifications read, dismiss all notifications (`ops notify dismiss-all`), share a record, remove a share, move a deliverable to another project, or set the agent defaults of a project or a deliverable (`ops agents defaults set`) unless the operator asks.
 6. **Do not repeat a write blindly.** A network error (exit 4) or `bad_response` can come after the service saved the write. Read the record or the list first. Repeat the write only when it did not land. Never repeat a create or a comment without that check.
 7. **Keep titles exact.** A task title that ends with a space and one digit (`0`–`7`) loses the digit: Ops reads it as the rarity.
 8. **Use only the CLI.** Do not call Convex directly, and do not edit the files of the credential.
@@ -290,6 +302,9 @@ Each recipe uses `--org <org>` when the org is not the active one. Use `--json` 
 |---|---|
 | Exit 3, `auth_required` or `unauthenticated` | No credential, or it expired. Run `ops login` (or `nuu login` for prod). A headless agent reports it to the operator. |
 | A write went to the wrong data | A prod build always uses PROD data, and a dev build uses PROD data by default (Task 415). For dev data, run `OPS_DATA_MODE=dev node "<monorepo>/apps/cli-ops/bin/ops.js" <command>`. Before each write, run `… mode` with the same command and check `build mode dev` and `data mode dev (env OPS_DATA_MODE)`. |
+| Exit 3, `network_sign_in` | NUU Network does not accept the sign-in of `ops agents`. Run the command that the line names: `nuu login` (a dev build on dev data: `ops login`). A headless agent reports it to the operator. |
+| `agent_defaults_invalid` | `ops agents defaults set` got a bad value. A Flint is `@v1/<org>/flint/<slug>`, a computer is its name (`katana`), a site is `@v1/<org>/site/<site id>#<computer>`, a profile is `runtime/profile` (`claude/o55xh`), and a mode is `headless`, `interactive`, or `obsidian`. `none` clears a value. |
+| `A task holds no agent defaults` (exit 2) | Set the agent defaults on the deliverable or the project of the task. The `next:` line names it. |
 | Exit 2, `<kind>_ambiguous` or `place_ambiguous` | The title matches more than one record. Use an ID or an address from the list. |
 | `<kind>_not_found`, `wrong_kind` | The reference names no record of that kind in the org. Run `ops search` or `ops headers`, and check `--org`. |
 | `org_unauthorized`, `org_mismatch` | You are not a member of the org, or `--org` is not the org of the record. Run `ops org list`; drop `--org` for an ID or an address. |
