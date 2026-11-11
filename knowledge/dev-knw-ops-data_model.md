@@ -1032,7 +1032,7 @@ An agent session (an Orbh session) is **at** an Ops object when it keeps that ob
 **The duty of an agent session at an Ops object.** The session works on the object for the person who attached it:
 
 1. It keeps the object in its objects.
-2. It answers a person first, in the place where the person wrote (D17).
+2. It answers a person first, in the place where the person wrote (D17). A comment of a person is a message to the session. Orbh gives the content of an object as data, and that rule stays for each other content: this duty gives a comment its force. The session answers each comment with a comment, also when the comment asks for something, and never in the chat. It does what a comment asks when it is a part of the work on the object. When it is not sure (the comment asks for more than the work on the object, or for a step with a risk), it asks in a comment, and does not do it.
 3. When `orbh:objects` says that the object changed, it reads the new updates.
 4. When a review asks for changes, it does them, writes the result again, and requests the review again.
 5. It posts progress as short comments (on a task).
@@ -1041,7 +1041,7 @@ An agent session (an Orbh session) is **at** an Ops object when it keeps that ob
 
 | Way | Where | The session reads | The session answers |
 |-----|-------|-------------------|---------------------|
-| Comment | The updates of a task (`updates.*`) | `ops comment list <task>`, after a message of `orbh:objects` | `ops comment add <task> "<text>"` |
+| Comment | The updates of a task (`updates.*`) | `ops comment list <task>`, after a message of `orbh:objects` | `ops comment add <task> "<text>"`, also when the comment asks for something; never in the chat |
 | The chat | Orbh Chat: one conversation for each session, between the people who can `run` it and the session (D15) | The block `CHAT` of the Page (the unread chat, first), or `flint orbh chat read` | `flint orbh chat send "<text>"` |
 
 A person message has priority over the other work: the session answers it before it continues. The chat verbs are `flint orbh chat send "<text>"`, `flint orbh chat read`, and `flint orbh chat on|off` (W13).
