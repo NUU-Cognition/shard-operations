@@ -293,7 +293,7 @@ Each recipe uses `--org <org>` when the org is not the active one. Use `--json` 
     ops task context <task> --json                              # a comment of a person with media: comments[].media [{ id, name, kind, mime, size }]
     ops media get <task> <fileId> -o out/                       # download a file of a comment to read it
     ```
-    An image (PNG, JPEG, GIF, WebP, AVIF) has at most 20 MB, and a video (MP4, WebM, MOV) at most 100 MB. With `ffmpeg` on PATH, a video gets faststart and a poster; without it, stderr has one notice, and the video goes as it is. The comment body holds the embed only. Do not post the URL of `ops media url`: it gives access to the file for 1 to 2 hours to each person who has it.
+    An image (PNG, JPEG, GIF, WebP, AVIF) has at most 20 MB, and a video (MP4, WebM, MOV) at most 100 MB. With `ffmpeg` on PATH, a video gets faststart and a poster; without it, stderr has one notice, and the video goes as it is. The comment body holds the embed only. After a network error of `attach`, read `ops comment list <task> --json` before you attach again: the Update can be saved. Do not post the URL of `ops media url`: it gives access to the file for 1 to 2 hours to each person who has it.
 
 # Safety Rules
 

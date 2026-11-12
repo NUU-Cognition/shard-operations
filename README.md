@@ -1,6 +1,19 @@
 # Operations
 
-Work in NUU Operations through the `ops` CLI: tasks in two parts (a Flint task note and an Ops task, linked both ways) with the task workflows, the projects note of the Flint, images and videos in Updates (`ops media`), projects, deliverables, sections, tasks and subtasks, task groups, the review queue, the people looped into a task, Trident streams and workspaces, shares, holds, calendars and events, deployments and their inboxes, the route decision, addresses, deadlines, blockers, plans and the plan canvas, notepads, day plans, and `ops query`. The entry point is the main skill `sk-ops-use_operations`.
+This shard lets an agent work in NUU Operations through the `ops` CLI. The entry point is the main skill `sk-ops-use_operations`. The shard gives these jobs:
+
+- Tasks in two parts: a Flint task note and an Ops task, linked both ways, with the task workflows.
+- The projects note of the Flint: `Mesh/(System) Ops Projects.md`.
+- Images and videos in Updates: `ops media`.
+- Projects, deliverables, sections, tasks and subtasks, and task groups.
+- The review queue and the people looped into a task.
+- Trident streams and workspaces.
+- Shares, holds, calendars, and events.
+- Deployments and their inboxes.
+- The route decision and addresses.
+- Deadlines, blockers, plans, and the plan canvas.
+- Notepads and day plans.
+- `ops query` for any other read.
 
 The source moved from the NUU Operations Flint to the NUU Flint on 2026-10-21 (ops-command-1021). Version 0.2.0 follows the revamp of Ops: sections in four homes, no closer, the backlog as a section, subtasks, the task map, abstract deployments with an inbox, the hidden context, `ops headers`, `ops route`, and `ops search`.
 

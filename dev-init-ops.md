@@ -29,10 +29,17 @@ Load this shard when a request touches Operations records: projects, deliverable
 
 ## The Projects of This Flint
 
-**Read `Mesh/(System) Ops Projects.md` when you start.** It lists the projects of the Ops org that matter to this Flint: the projects and the deliverables whose Flint place is this Flint, the project with the name of this Flint, the likely projects of the route decision, and a table of all projects of the org, each with its address. The text under `# Notes` is the text of a person: follow it. Use the note to know the work of this Flint and to choose the place of a new task.
+**Read `Mesh/(System) Ops Projects.md` when you start.** It lists the projects of the Ops org that matter to this Flint. The note uses three rules:
+
+1. A project is in the section `## Projects of This Flint` when the project, or one of its deliverables, has this Flint as its Flint place.
+2. A project is also in that section when its name is the name of this Flint.
+3. A project is in the section `## Other Likely Projects` when the route decision of Ops gives a place in it with a score of 0.3 or more.
+
+The note also has a table of all projects of the org, each with its address. The text under `# Notes` is the text of a person: follow it. Use the note to know the work of this Flint and to choose the place of a new task. When the note has `complete: false`, a read of Ops failed: its section `## Status` names each failed read.
 
 - The setup of this shard ([[dev-setup-ops]]) writes the note one time: `flint shard ops projects-note`.
-- When the note is missing, or its field `updated` is older than 7 days, or a project of the work is not in it, run `flint shard ops projects-note` again. It keeps the `id` and the section `# Notes`. It reads only from Ops.
+- When the note is missing, or its field `updated` is older than 7 days, or it has `complete: false`, or a project of the work is not in it, run `flint shard ops projects-note` again. It keeps the `id`, the section `# Notes`, and the line ends. It reads only from Ops.
+- When a person or another session writes the note during the run, the script writes nothing and refuses with `note_changed`: run it again. When a read of Ops fails, the script exits 1. It keeps the old project sections, or it writes nothing when the project list fails.
 - The note is a list, not the state. For the current state of a project, read Ops: `ops project show "<address>" --json`.
 
 ## What Operations Is
@@ -229,7 +236,7 @@ Work that changes code in a repository makes WIP commits. Read [[dev-knw-ops-tas
 | task-new for an Ops task that exists | `flint shard ops task-new ["<title>"] --ops <ref> [--org <org>] [--body-file <path>]` | The same |
 | task-link | `flint shard ops task-link "<(Task) N Title>" [--ops <ref>] [--org <org>] [create options]` | `{ number, title, path, note, noteLabel, ops, created }` |
 | task-sync | `flint shard ops task-sync "<(Task) N Title>"`, or the Ops address | `{ number, title, path, ops, status, changed, noteLinked }` |
-| projects-note | `flint shard ops projects-note [--org <org>] [--dry-run]` | `{ ok, path, org, flint, linked, likely, projects, changed }` |
+| projects-note | `flint shard ops projects-note [--org <org>] [--dry-run]` | `{ ok, path, org, flint, linked, likely, projects, changed, complete, failed }` |
 
 The scripts run `ops` through `NUU_OPS_CLI` (default `ops`). Leave it unset for work on prod data. [[dev-knw-ops-task_cli]] § The Note Scripts gives each option, each refusal, and the map of the status. When the output of `task-new` has `ops: null`, the note exists and the Ops part failed: run the command of `next`. Never run `task-new` again for the same task.
 
