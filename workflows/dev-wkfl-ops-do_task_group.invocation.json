@@ -1,0 +1,76 @@
+{
+  "format": "shard-invocation/0.3",
+  "workflow": "wkfl-ops-do_task_group",
+  "title": "Do Task Group",
+  "inputs": {
+    "task": {
+      "kind": "text",
+      "required": false,
+      "description": "The address of the task group, for example @v1/nuucognition/taskgroup/<id>#ops. For a new task group, give no input, and set it after Stage 1 with flint shard invocations set-input <id> task=<address>."
+    }
+  },
+  "steps": [
+    {
+      "id": "group",
+      "title": "Task Group",
+      "by": "agent",
+      "evidence": "required",
+      "stage": "Stage 1: Task Group",
+      "next": "Read the task group with ops task group show --json, or make it with ops task group create. Read each task, and choose the order. For a new task group, set the input: flint shard invocations set-input {{invocation}} task=<address>."
+    },
+    {
+      "id": "objects",
+      "title": "Task Objects",
+      "by": "agent",
+      "evidence": "required",
+      "stage": "Stage 2: Task Objects",
+      "next": "Add each task of {{task}} as an object: flint orbh objects add <task address> --subscribe (at most 20 items). Do not add the task group. Check the items with flint orbh objects list."
+    },
+    {
+      "id": "work",
+      "title": "Each Task",
+      "by": "agent",
+      "evidence": "required",
+      "stage": "Stage 3: Each Task",
+      "next": {
+        "interactive": "Do the tasks of {{task}} one at a time. For each task: write its result with its own commits and the session, and run flint shard ops task-sync on it. Then, when its work is finished, ask for its review in Ops at once, with no wait for a person: ops task review request <task> --note '<the summary of this task, its commits, and what to check>' --json (on review_no_reviewer: again with --to me, the operator). Record its itemId. A blocked or unfinished task gets no request: record its blocker. Close each task alone, only after its request is recorded, when the person confirms.",
+        "headless": "Set the phase implementing. Do the tasks of {{task}} one at a time, and keep the progress current. For each task: write its result with its own commits and the session, and run flint shard ops task-sync on it. Then, when its work is finished, ask for its review in Ops at once: ops task review request <task> --note '<the summary of this task, its commits, and what to check>' --json (on review_no_reviewer: again with --to me, the operator). Record its itemId. A blocked or unfinished task gets no request: record its blocker, and go on to the next task."
+      }
+    },
+    {
+      "id": "summary",
+      "title": "Summary and Review Handoff",
+      "by": "agent",
+      "evidence": "required",
+      "stage": "Stage 4: Summary and Review Handoff",
+      "next": {
+        "interactive": "Give the person a summary of each task: its review request (the reviewer and the itemId of the step work) or its blocker, and the review_task command of each open task. Do not ask for a review again. Then close the invocation: flint shard invocations close {{invocation}} --outcome done.",
+        "headless": "Do not ask for a review again: the step work asked for each finished task. Put each itemId and reviewer in the evidence of this step and in the result, and the blocker of each task that is not finished. Set the phase complete. Close the invocation: flint shard invocations close {{invocation}} --outcome done. Put the summary of each task and each review_task command in the result. When no parent frame is open, return with flint orbh session return --finish. When the close prints back in: (a parent frame is open), do not return: continue the parent frame."
+      }
+    }
+  ],
+  "behaviours": [
+    {
+      "id": "objects-hint",
+      "on": "invocation.open",
+      "when": { "task": "set" },
+      "say": "Add each task of {{task}} as an object before the first edit: flint orbh objects add <task address> --subscribe"
+    },
+    {
+      "id": "task-missing",
+      "on": "session.return",
+      "phase": "before",
+      "disposition": ["finish"],
+      "when": { "task": "empty" },
+      "say": "The input task is empty: no task group is recorded. Set it with flint shard invocations set-input {{invocation}} task=<address>, or close the invocation with --outcome abandoned."
+    },
+    {
+      "id": "review-check",
+      "on": "session.return",
+      "phase": "before",
+      "disposition": ["finish"],
+      "when": { "task": "set" },
+      "say": "Before the return: each finished task of {{task}} has its result, with its own commits, and exactly one review request in Ops, asked after its result and before any close (ops task review request <task> --note '<…>' --json; on review_no_reviewer: --to me). Each blocked or unfinished task has no request and has its blocker. Put each itemId, each blocker, and each review_task command in the result."
+    }
+  ]
+}

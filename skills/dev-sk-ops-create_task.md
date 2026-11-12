@@ -1,5 +1,5 @@
 ---
-description: "Create an Ops task in the right place (a named place, the route decision, or ops route first), then check the printed address and place"
+description: "Create a task in the right place as a task note and an Ops task, linked both ways (flint shard ops task-new), with a named place or a place from ops route, then check the place"
 orb:
   - "@v1/nuucognition/session/63260df7-271a-450f-b775-0cdfdedebc26#flint/nuu-flint"
 orbh-fleet: ops-command-1021
@@ -11,65 +11,59 @@ Run `flint shard start ops` if you haven't already.
 
 # Skill: Create Task
 
-Create one task (or one subtask) in the right place, and check that Ops put it there.
+Create one task (or one subtask) in the right place, and check that Ops put it there. The task has two parts, linked both ways: a task note in this Flint (the content) and an Ops task (the state). `flint shard ops task-new` makes both in one run. See [[dev-init-ops]] § Tasks: the Task Note and the Ops Task.
+
+This skill makes the task only. To scope it with the person, use [[dev-wkfl-ops-create_task]]. To create it and do it, use [[dev-wkfl-ops-create_and_do_task]].
 
 # Input
 
 - The task title. Do not end it with a space and one digit: `tasks.create` reads that digit as a rarity and removes it.
 - (Optional) A place that the request names: a section, a project, a deliverable, a deployment, or a parent task
-- (Optional) A body, a priority, an owner, a tag (for an inbox task), a recurrence
+- (Optional) The body of the task note, a priority, an owner, a repository, a tag (for an inbox task), a recurrence
 - (Optional) The org and the data mode
 
 # Actions
 
-1. **Ground.** Run `ops whoami --json` before the first write. A dev build gives the field `dataMode`. A prod build has no such field: the `ops` on PATH can be the prod build, and a prod build writes to PROD data whatever `OPS_DATA_MODE` says. For DEV data, use the dev launcher (`OPS_DATA_MODE=dev node <monorepo>/apps/cli-ops/bin/ops.js …`; see the init § Prerequisite). `ops --help` must list `headers`, `route`, `search`, and `section`; when it does not, the build is of before the revamp: stop and report it. Pass `--org <org>` on each command when the task belongs to an org that is not active.
-2. **Pick the place.** Use the first rule that applies:
+1. **Ground.** Run `ops whoami --json` before the first write. A dev build gives the field `dataMode`. A prod build has no such field: the `ops` on PATH can be the prod build, and a prod build writes to PROD data whatever `OPS_DATA_MODE` says. For DEV data, run the scripts with `NUU_OPS_CLI` set to the dev launcher ([[dev-knw-ops-task_cli]] § Work on Dev). `ops --help` must list `headers`, `route`, `search`, and `section`; when it does not, the build is of before the revamp: stop and report it. Pass `--org <org>` when the task belongs to an org that is not active.
+2. **Look before you create.** Find an open task with the same intent: `ops task search "<words of the title>" --json` (check the status of each match). When one exists, do not create a second task: give its address, and stop.
+3. **Pick the place.** Use the first rule that applies:
    1. **The request names a place.** Use its flag:
 
-      | Place | Flag |
+      | Place | Flag of `task-new` |
       |-------|------|
       | A section | `--section <ref>` |
       | The backlog of a project | `--project <ref>` |
       | A deliverable (its main section: the named section) | `--deliverable <ref>` |
-      | The inbox of a live deployment | `--deployment <ref>`, with `--tag feedback\|hotfix\|ongoing\|recurring` |
+      | The inbox of a live deployment | `--deployment <ref>` (then set the tag: step 5) |
       | Under a task (a subtask, in the home of its root) | `--parent <task>` |
-      | The master backlog of the org | `--master` (also the default when you give no place) |
-      | No home | `--unplaced` |
+      | The master backlog of the org | `--master` |
+      | No home | `--unplaced` (also the default when you give no place) |
 
-      A `<ref>` is an ID, an address, a web URL, a title, or a path (`Alpha › v1 › Backend`). Give one place flag only: two give a usage error (exit 2).
-   2. **The request names no place, and you must see the choices first** (the text is short, or it can fit two projects). Run `ops route "<text>" --json`. Read `candidates[]`: `place.kind`, `place.id`, `place.path`, `score`, and `reason`. Read `model`: `jev` (the decision model) or `text` (the text match only). Take the best candidate that fits the request. Give it with the flag of its kind: `section` → `--section <id>`, `deliverable` → `--deliverable <id>`, `project` → `--project <id>`, `deployment` → `--deployment <id>`. **No place fits** when the list is empty, when the best `score` is below 0.3, or when the reason of the best candidate is only "A recent project" (the route found no word of the text in that place). Then do one of these, in this order: (a) ask the operator for the place, when one is there; (b) use `--master` (the master backlog), and say so; (c) when the request asks for a new place, make it (`ops project create`, `ops section create <title> --project <p>`, then `ops project context set <p> "<what belongs here>"`), and run `ops route` again: the new place must now be the best candidate. A score from 0.3 to 0.5 is a guess: name the place in the output, so that the operator can move the task.
-   3. **The request names no place, and the text says clearly what the task is about.** Add `--route` (or `--route "<other text>"` to route on a text that is not the title). Ops puts the task in the top place of the route decision. Read `routed.score` in the output: below 0.3 is no fit, and below 0.5 is a guess (see the rule of step 2.2); move the task when the place is wrong.
+      A `<ref>` is an ID, an address, a web URL, a title, or a path (`Alpha › v1 › Backend`). Give one place flag only: two give a refusal, and nothing changes.
+   2. **The request names no place.** Read the projects note first (`Mesh/(System) Ops Projects.md`, [[dev-init-ops]] § The Projects of This Flint): it names the projects of this Flint. Then run `ops route "<text>" --json`. Read `candidates[]`: `place.kind`, `place.id`, `place.path`, `score`, and `reason`. Take the best candidate that fits the request. Give it with the flag of its kind: `section` → `--section <id>`, `deliverable` → `--deliverable <id>`, `project` → `--project <id>`, `deployment` → `--deployment <id>`. **No place fits** when the list is empty, when the best `score` is below 0.3, or when the reason of the best candidate is only "A recent project". Then do one of these, in this order: (a) ask the operator for the place, when one is there; (b) apply the hint rule of [[dev-sk-ops-place_task]] after the create (the task stays unplaced, or gets `related` links); (c) when the request asks for a new place, make it (`ops project create`, `ops section create <title> --project <p>`), and run `ops route` again. A score from 0.3 to 0.5 is a guess: name the place in the output, so that the operator can move the task.
 
-   When you do not know the names of the places, read the map of the org first: `ops headers --json` (each project, deliverable, section, and deployment with its address), or `ops search "<text>" --type section,deliverable,project,deployment --json`.
-3. **Create the task.**
+   `task-new` has no `--route`: read the route first. When you do not know the names of the places, read the map of the org: `ops headers --json`, or `ops search "<text>" --type section,deliverable,project,deployment --json`.
+4. **Create the task.** Write the body of the task note to a temporary file outside the Mesh (the sections of the template `tmp-proj-task-v0.2`, with no frontmatter: [[dev-knw-ops-task_model]] § The Task Note). Then:
 
    ```bash
-   ops task create "<title>" <place flag> [--body <text> | --body-file <path>] [--priority low|medium|high|urgent] [--assign <member>] --json
+   flint shard ops task-new "<title>" <place flag> [--repo <name>] [--priority low|medium|high|urgent] [--assign <member>] [--org <org>] --body-file <file>
    ```
 
-   - A subtask: `--parent <task>`, or `ops task subtask add <parent> "<title>" --json`. Subtasks have one level: the parent must be a root task, because a subtask has no subtasks (`subtask_too_deep`).
-   - A recurring task: `--every day|week|month`. Its next copy comes in the same place when it is done.
+   - The output is one JSON document: `number`, `title`, `path` (the task note), `note` (the note address), `noteLabel`, and `ops` (the Ops address, `@v1/<org>/task/<id>#ops`). Keep `ops` and `path`.
+   - When `ops` is `null`, the note exists and the Ops part failed. Read `error`, fix the cause, then run the command of `next` (`task-link`). Never run `task-new` again for the same task: a second run makes a second note.
    - The repository of the work: `--repo <name>` adds a `repo` related link.
-   - For many tasks in one place, run one create for each task, in the order they must show. Do not use `--top` for a list: it writes a second gesture for each task.
-4. **Check the output.** The JSON has these fields:
-
-   | Field | Check |
-   |-------|-------|
-   | `id`, `address` | Keep both. The address is `@v1/<org>/task/<id>#ops`. |
-   | `place` | `{kind, id, title, path, address}`: the place that you gave, or that the route picked |
-   | `sectionId` | The section that holds the task (for `--section`, `--project`, `--deliverable`, and `--deployment`) |
-   | `title` | The stored title. It is shorter when the title ended with a digit. |
-   | `routed` | Only with `--route`: `{op, model, score, reason, candidates}`. With no candidate, `place.kind` is `master`. |
-
-   The text output (with no `--json`) has the same facts on these lines: `created task <id>  <title>`, the address, `in <place>`, `section <id>  <path>`, and `routed by <model> (score <n>): <reason>`.
-5. **Fix a wrong place at once.** Compare the place and the section path with the request. When the place is wrong, move the task: `ops task move <address> --to <place> --json` ([[dev-sk-ops-move_tasks]]). Do not delete the task and create it again.
-6. **On an error**, do not guess:
-   - `<kind>_ambiguous` or `place_ambiguous` (exit 2): the error lists the candidates with their `kind:<id>` forms. Run the command again with the ID that fits the request.
+   - A subtask: `--parent <task>`. Subtasks have one level: the parent must be a root task (`subtask_too_deep`).
+5. **Set what `task-new` does not set.** An inbox task: `ops task update <ops address> --tag feedback|hotfix|ongoing|recurring --json`. A recurring task: `ops task update <ops address> --every day|week|month --json`.
+6. **Check the place.** Run `ops task show <ops address> --json`. Read `task.homeLabel` (the path of the home, `Project › Deliverable › Section`) and `task.unplaced`. Compare them with the request. When the place is wrong, move the task: `ops task move <ops address> --to <place> --json` ([[dev-sk-ops-move_tasks]]). Do not delete the task and create it again.
+7. **On an error**, do not guess:
+   - `<kind>_ambiguous` or `place_ambiguous` (exit 2): the error lists the candidates. Run the command of `next` with the ID that fits the request.
    - `deployment_no_inbox`: the deployment is not live. Make it live only when the request asks: `ops deployment status <deployment> live`.
-   - Exit 4 (network): the create can have landed. Before a second create, search for the title: `ops task search "<title>" --json`.
+   - An unknown outcome (a network error): the output has `next` (a search) and `ifFound` (a `task-link`). Run the search. When the task exists, run `ifFound`. Never create the task again before that check.
+
+A planning write that makes many tasks for later work in Ops (a deliverable setup, a plan, an inbox triage) can make Ops tasks alone with `ops task create … --json`, one create for each task, in the order they must show. Each such task gets its note when its work starts ([[dev-wkfl-ops-do_task]]).
 
 # Output
 
-- One new task (or subtask) with its ID, its address, and its place (the section path)
-- With `--route` or `ops route`: the model, the score, and the reason of the place
+- One new task (or subtask): the task note (its path) and the Ops task (its ID, its address, and its place), linked both ways
+- With `ops route`: the score and the reason of the place
 - A move, when the first place was wrong

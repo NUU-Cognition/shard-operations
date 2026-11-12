@@ -12,7 +12,7 @@ orbh-fleet: ops-command-1021
 
 # Knowledge: The `ops` CLI
 
-`ops` is the NUU Operations CLI for agents. It covers the places, the tasks, the deployments, the plans, the deadlines, the blockers, the notepads, the day plan, and a read query over the tables (`ops query`). It calls the Operations agent gateway with the nuu CLI credential. The gateway sends each op to the public Convex function that the web app calls. For the records and the rules behind each command, read [[dev-knw-ops-data_model]]. For plan positions, read [[dev-knw-ops-canvas]]. For the task primitive of Task 1287 (types, stages, lineage, task groups), the Tasks shard has more depth: [[knw-task-cli]].
+`ops` is the NUU Operations CLI for agents. It covers the places, the tasks, the deployments, the plans, the deadlines, the blockers, the notepads, the day plan, and a read query over the tables (`ops query`). It calls the Operations agent gateway with the nuu CLI credential. The gateway sends each op to the public Convex function that the web app calls. For the records and the rules behind each command, read [[dev-knw-ops-data_model]]. For plan positions, read [[dev-knw-ops-canvas]]. For the task primitive of Task 1287 (lineage, task groups, attachments) and the task scripts (`task-new`, `task-link`, `task-sync`), read [[dev-knw-ops-task_cli]].
 
 Source: `apps/cli-ops` in the NUU monorepo (package `@nuucognition/ops-cli`). This file follows its `README.md`. Its `src/commands/*.ts` are the truth when this file and the code differ. `node --import tsx scripts/help-tree.ts` in `apps/cli-ops` prints the help of every command.
 

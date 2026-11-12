@@ -25,7 +25,15 @@ Load this shard when a request touches Operations records: projects, deliverable
 
 **Start here: [[dev-sk-ops-use_operations]].** It is the main skill of this shard. It gives the model, the builds and the sign-in, the org, references and places, the command for each job, `ops query` and `ops call` for any other read or write, sixteen recipes, the safety rules, and troubleshooting. Follow it for any Operations request. The other skills and workflows go deeper on one job.
 
-For the task primitive of Task 1287 (the close and the result, lineage, task groups, attachments) the Tasks shard has the depth: `flint shard start task`, then [[knw-task-cli]] and [[knw-task-model]].
+**Tasks have two parts.** Each task that this shard makes has a task note in this Flint (the content) and an Ops task (the state), linked both ways. Make each task with `flint shard ops task-new`, and do it with the task workflows. § Tasks: the Task Note and the Ops Task gives the rules. Before you create, do, or close a task, read [[dev-knw-ops-task_model]] and [[dev-knw-ops-task_cli]]. Since Operations 0.8.0 this shard holds the work of the former Tasks shard (`task`), which is deprecated.
+
+## The Projects of This Flint
+
+**Read `Mesh/(System) Ops Projects.md` when you start.** It lists the projects of the Ops org that matter to this Flint: the projects and the deliverables whose Flint place is this Flint, the project with the name of this Flint, the likely projects of the route decision, and a table of all projects of the org, each with its address. The text under `# Notes` is the text of a person: follow it. Use the note to know the work of this Flint and to choose the place of a new task.
+
+- The setup of this shard ([[dev-setup-ops]]) writes the note one time: `flint shard ops projects-note`.
+- When the note is missing, or its field `updated` is older than 7 days, or a project of the work is not in it, run `flint shard ops projects-note` again. It keeps the `id` and the section `# Notes`. It reads only from Ops.
+- The note is a list, not the state. For the current state of a project, read Ops: `ops project show "<address>" --json`.
 
 ## What Operations Is
 
@@ -69,7 +77,9 @@ The service derives some states. A section is done when all its root tasks are d
 | Find a task or a place | `ops search "<text>"`, `ops task search "<text>"` |
 | Read a task before you work on it | `ops task context <task>` |
 | See where a new task belongs | `ops route "<text>"` |
-| Create a task in the right place | `ops task create "<title>" --section|--project|--deliverable|--deployment|--parent <ref>`, or `--route` |
+| Create a task in the right place (a task note and an Ops task) | `flint shard ops task-new "<title>" --section|--project|--deliverable|--deployment|--parent <ref>` ([[dev-sk-ops-create_task]]) |
+| Plan a task, do a task, or create and do it | [[dev-wkfl-ops-create_task]], [[dev-wkfl-ops-do_task]], [[dev-wkfl-ops-create_and_do_task]] (§ Tasks: the Task Note and the Ops Task) |
+| Close a task with its result | `ops task result <task> "<text>"`, `ops task close <task>`, then `flint shard ops task-sync <task>` ([[dev-sk-ops-close_task]]) |
 | Move tasks (with their subtasks) | `ops task move <tasks...> --to <place>` |
 | Move a deliverable to another project | `ops deliverable move <deliverable> --to <project>` |
 | See a task with its home, groups, and lineage | `ops task map <task>` |
@@ -158,6 +168,89 @@ The gateway accepts the operator's credential. So every write is the operator's 
 7. **Keep titles exact.** `tasks.create` reads a trailing space and one digit `0`–`7` as a rarity and removes it from the title. Do not end a task title with ` <digit>` unless you want that rarity.
 8. **Network errors (exit 4) and writes.** A network error can come after the service committed the write: the CLI sends no idempotency key, so a repeated write can make a duplicate. A read (`list`, `show`, `context`, `search`, `history`, `ops ops`) is safe to run again: retry it once automatically. Before you repeat a write, read the record (or the list it would change) and check whether the write landed. When it landed, do not repeat it. When you cannot tell, report the uncertain state with the command and the record. Never repeat a create (`create`, `add`, `insert`, `comment add`) or a comment without that check. A write that sets one value (for example `task start`, `task done`, `update --priority`) is safe to repeat after the check shows the old value. This rule also applies to `bad_response` and response-body read failures, which can return exit 1. Check the affected records before any retry. If the result is unclear, report it and do not repeat the write.
 
+## Tasks: the Task Note and the Ops Task
+
+A task is one row of the Ops table `tasks`: any coherent unit of work. Each task that this shard makes has two parts, linked both ways (Task 1291 of the NUU Flint). Strike and Trident attach to the Ops task. An Orbh session keeps the Ops task in its context as an object of the Objects Protocol. The full model is in [[dev-knw-ops-task_model]], and each command is in [[dev-knw-ops-task_cli]].
+
+| Part | Where | It holds | The link |
+|---|---|---|---|
+| Task note | `Mesh/Types/Tasks/(Task) <n> <title>.md`, tag `#proj/task`, template `tmp-proj-task-v0.2` of the Projects shard | The content: the context, the requirements, the definition of done, the Task Log, and the notes | Its field `ops` holds the Ops address |
+| Ops task | NUU Ops | The state: the status, the result, the place, the lineage, the task groups, and the attachments | Its field `note` holds the note address (`@v1/<org>/task/<note id>#flint/<flint>`), and its body stays empty |
+
+- **Make each task with `task-new`:** `flint shard ops task-new "<title>" [<place>] [--repo <name>] [--body-file <path>]`. It writes the note, makes the Ops task, and links both. Do not write a task note by hand. Do not make an Ops task alone with `ops task create` for work in this Flint.
+- **A planning write can make Ops tasks alone.** A write that makes many tasks for later work in Ops (a deliverable setup, a plan, an inbox triage) can use `ops task create`. Such a task gets its note when its work starts: `flint shard ops task-new --ops <ref>` ([[dev-wkfl-ops-do_task]] Stage 1 does it). A task that a person makes in the web, or that Strike makes, also has no note.
+- **Ops owns the state.** `flint shard ops task-sync <ref>` copies the status and the date of the close into the note, in one direction only. Do not edit `status`, `completed`, or `ops` of the note by hand: change the Ops task, then run `task-sync`. Link a note that exists with `flint shard ops task-link "<(Task) N Title>" [--ops <ref>]`.
+- **The Ops address stays the key.** The task object, the invocation input `task`, and the attachments use the Ops address. Ops shows the note as "Open in Obsidian". To keep another Mesh note with a task, attach it: `ops task attach <ref> note "<Mesh path>"`.
+- The Projects shard does not change: its own workflows make task notes with no Ops task. Do not mix the two shards on one task.
+
+### The Hard Rule
+
+**Before work that changes a file or makes an artifact, the session adds the task as an object:** `flint orbh objects add <task address> --subscribe`.
+
+- When no task fits the work, create one ([[dev-wkfl-ops-create_task]], or [[dev-wkfl-ops-create_and_do_task]] to create and do it). Then add its Ops address as an object.
+- Reading, research with no artifact, and an answer in the conversation need no object.
+- Take the task only for a change that must not collide with another session (`flint orbh objects take <task address>`, then `return`). When a verb answers `held` (exit 9), send a request (`flint orbh objects request <task address> --note "<why>"`). Do not get around the hold.
+- For a task group, add each task of the group: the object of a task group does not resolve. When you dispatch a subagent for the work, put the address of the task in the prompt.
+- [[dev-sk-ops-use_task]] gives the steps. The rules of an object are in the skill `sk-foh-use_object` of the Orbh shard.
+
+### Task or Subtask
+
+- When new work serves the intent of a task object of the session, it is a **subtask** of that task: a Strike target mounted on the Ops task, not a new task.
+- When the work does not serve that intent, it is a **new task**. Create it, or add the task that fits as an object.
+- Ops has subtasks of its own (one level only, `subtask_too_deep`). Make an Ops subtask only when the person asks for one.
+
+### Placement
+
+A task has 0 or 1 home and 0 or more `related` links. A task with no home is unplaced, and that is normal. A place that the person or the prompt gives wins: give it to `task-new` (`--section`, `--project`, `--deliverable`, `--deployment`, `--parent`, `--master`). Else read the hints (`ops task hints --flint <Flint id> --text "<title>"`) and apply the rule of [[dev-sk-ops-place_task]]: one clear hint sets the home; two or more hints add a `related` link each; no hint leaves the task unplaced. The projects note (§ The Projects of This Flint) and `ops route "<text>"` help to choose. A task whose work changes code in a repository has a `repo` link (`--repo <name>`).
+
+### Status, Result, Review, and Close
+
+```
+todo → doing → done
+          ↑       │
+          └───────┘ reopen
+```
+
+- A task has no type, no stage, and no outcome. Its state is its status and its result. Progress goes into the result: `ops task result <ref> "<text>"` (what the work gave, the commits, the session).
+- **Each finished task gets exactly one review request in Ops**, after its result and before any close, in each work workflow (`do_task`, `create_and_do_task`, `do_task_group`): `ops task review request <ref> --note "<the summary, the commits, and what to check>" --json`. Record its `itemId`. A task of a team with no owner refuses with `review_no_reviewer`: then give `--to me`. A blocked or unfinished task gets no request.
+- After each change of the Ops state (a start, a close, a reopen), run `flint shard ops task-sync <ref>`.
+- [[dev-sk-ops-close_task]] gives the close.
+
+### WIP Commits
+
+Work that changes code in a repository makes WIP commits. Read [[dev-knw-ops-task_commits]] before the first commit. Commit only your paths on the machine branch, with the subject `[OR] wip: <Flint name>/Task <short id> <what changed>` (the short id is the first 8 characters of the Ops id). Record the commits in the result of the task.
+
+### The Task Scripts
+
+| Script | Command | Output (JSON) |
+|---|---|---|
+| task-new | `flint shard ops task-new "<title>" [--repo <name>] [--org <org>] [--unplaced \| --section <s> \| --project <p> \| --deliverable <d> \| --deployment <d> \| --parent <task> \| --master] [--priority <p>] [--assign <member>] [--body-file <path>]` | `{ number, title, path, note, noteLabel, ops }` |
+| task-new for an Ops task that exists | `flint shard ops task-new ["<title>"] --ops <ref> [--org <org>] [--body-file <path>]` | The same |
+| task-link | `flint shard ops task-link "<(Task) N Title>" [--ops <ref>] [--org <org>] [create options]` | `{ number, title, path, note, noteLabel, ops, created }` |
+| task-sync | `flint shard ops task-sync "<(Task) N Title>"`, or the Ops address | `{ number, title, path, ops, status, changed, noteLinked }` |
+| projects-note | `flint shard ops projects-note [--org <org>] [--dry-run]` | `{ ok, path, org, flint, linked, likely, projects, changed }` |
+
+The scripts run `ops` through `NUU_OPS_CLI` (default `ops`). Leave it unset for work on prod data. [[dev-knw-ops-task_cli]] § The Note Scripts gives each option, each refusal, and the map of the status. When the output of `task-new` has `ops: null`, the note exists and the Ops part failed: run the command of `next`. Never run `task-new` again for the same task.
+
+### Task Invocations
+
+Each task workflow has an invocation file (`wkfl-ops-<name>.invocation.json`, format `shard-invocation/0.3`). The input `task` is the address of the task (or of the task group for Do Task Group). When the task does not exist at the open, set it later: `flint shard invocations set-input <id> task=<address>`.
+
+| Workflow | Start | Next workflow (`then`) |
+|---|---|---|
+| Create Task | `flint shard invoke ops create_task` | `ops do_task` |
+| Scope Task | `flint shard invoke ops scope_task [--input task=<address>]` | `ops do_task` |
+| Do Task | `flint shard invoke ops do_task --input task=<address>` | `ops review_task`, in a headless session only |
+| Create and Do Task | `flint shard invoke ops create_and_do_task` | `ops review_task`, in a headless session only |
+| Review Task | `flint shard invoke ops review_task --input task=<address>` | — |
+| Do Task Group | `flint shard invoke ops do_task_group [--input task=<task group address>]` | — |
+
+- Mark each step with `flint shard step done <step> --evidence "<…>"`, or skip it with `flint shard step skip <step> --reason "<why>"`. Outside an Orbh session, add `--invocation <id>`.
+- Close the invocation with `flint shard invocations close <id> --outcome done` when the workflow is finished. Only a `done` close prints the next workflow.
+- Inside another open frame, a task workflow is a child frame. After its `done` close, continue the parent frame: do not close the session, and do not return in a headless session.
+- An invocation that a session opened with the former Tasks shard (`flint shard invoke task …`) stays a record of that shard: continue it there, or close it with `--outcome abandoned` and open a new one here.
+- When no invocation is open, follow the stages with no record.
+
 ## Web Links
 
 Every command that shows a task or a place prints its web link or its address. The host is `https://ops.nuucognition.com` on prod data and `http://localhost:3088` on dev data. `<org>` is the team slug, or `me` for the personal workspace.
@@ -201,6 +294,17 @@ Read [[dev-knw-ops-cli]] for every command, flag, and error code. The essentials
 - [[dev-sk-ops-plan_deliverable]] — plan a deliverable with sections.
 - [[dev-sk-ops-read_task_map]] — read the task map of a task.
 
+The task workflows (a task note and an Ops task for each task):
+
+- [[dev-wkfl-ops-create_task]] — make a `todo` task for later work, place it with the hint rule, and scope it.
+- [[dev-wkfl-ops-scope_task]] — research first, then write the scope and the definition of done into the task note.
+- [[dev-wkfl-ops-do_task]] — add the task as an object, work, make the WIP commits, write the result with the commits, ask for the review in Ops, and give a summary.
+- [[dev-wkfl-ops-create_and_do_task]] — create a task, add it as an object, and do it in one run, with the review request after the result.
+- [[dev-wkfl-ops-review_task]] — a second session checks the work against the task note, and writes a pass into the result or the findings into the note.
+- [[dev-wkfl-ops-do_task_group]] — make or take a task group, add each of its tasks as an object, do each task, and ask for the review of each finished task.
+
+The task skills: [[dev-sk-ops-capture_as_task]] (record work that is already done), [[dev-sk-ops-use_task]] (keep a task in the session as an object), [[dev-sk-ops-place_task]] (the placement rule with the hints), [[dev-sk-ops-split_task]], [[dev-sk-ops-merge_tasks]], [[dev-sk-ops-continue_task]], [[dev-sk-ops-chain_tasks]], [[dev-sk-ops-group_tasks]], and [[dev-sk-ops-close_task]]. The task knowledge: [[dev-knw-ops-task_model]], [[dev-knw-ops-task_cli]], and [[dev-knw-ops-task_commits]].
+
 Each workflow serves both modes. A headless Orbh session loads the shard with `flint shard start ops`, and follows the `> [!headless]` callouts of each stage (see `# Headless`). Load the source with `flint shard start-dev ops` only to edit it.
 
 ## Work Tied To An Operations Task
@@ -237,7 +341,7 @@ The duty of the session, at each of the four types:
 
 ## Rules
 
-- This shard declares no Mesh artifact type. It writes no file to the Mesh. All data lives in the Operations backend.
+- This shard declares no Mesh artifact type. The data of Operations lives in the Operations backend. The shard writes two kinds of Mesh files: the task notes (the type `Task` of the Projects shard, written only by `task-new`, `task-link`, and `task-sync`), and the projects note `Mesh/(System) Ops Projects.md` (written only by `projects-note`).
 - IDs are opaque strings. Quote them exactly.
 - A user row ID (`ownerUserId`, `assigneeUserId`, `assigneeUserIds`) is not the same as an actor ID (`user:<clerkUserId>`). Use the user row ID for owners and assignees. Use the actor ID for comment mentions.
 - Dates are strings. A deadline date is `YYYY-MM-DD` or `YYYY-MM-DD HH:mm` in local wall-clock time.
@@ -283,6 +387,18 @@ Use the workflows and the skills of this init, and follow the `> [!headless]` ca
 - [[dev-wkfl-ops-backlog_triage]] — review and triage a backlog.
 - [[dev-wkfl-ops-deliverable_setup]] — a deliverable from a scope description.
 - The skills: [[dev-sk-ops-create_task]], [[dev-sk-ops-move_tasks]], [[dev-sk-ops-triage_inbox]], [[dev-sk-ops-plan_deliverable]], [[dev-sk-ops-read_task_map]].
+- The task workflows: [[dev-wkfl-ops-create_task]], [[dev-wkfl-ops-scope_task]], [[dev-wkfl-ops-do_task]], [[dev-wkfl-ops-create_and_do_task]], [[dev-wkfl-ops-review_task]], [[dev-wkfl-ops-do_task_group]], and the task skills of § Workflows and Skills.
+
+The task workflows replace each person gate as this table says:
+
+| Interactive | Headless |
+|---|---|
+| "Give the person the summary" | Put the summary in the result |
+| "Converse to refine" | Go on alone. Ask with a deferred request only when you are stuck. A subagent returns the question to its dispatcher. |
+| "When the person confirms" | Skip: no person confirms. The task stays open for a person or a review. |
+| A close that needs a person | Do not close. Put the close command in the result. |
+
+**A child frame does not return.** A task workflow can run as a child frame of another workflow. Then the close of its invocation prints `back in: <parent>`. Do not return and do not close the session: give the result to the parent frame, and continue it. The session returns when its outermost frame is done.
 
 When the work of this session belongs to one Operations task (a Strike preamble names it, the Mesh task of the work has the field `ops-task`, or the prompt names it), follow the Strike workflow `wkfl-strk-ops_do` and its `> [!headless]` callouts (`flint shard start strk`). It reads the task, starts it, and posts one place-relative update at each meaningful point (start, blocker, review stop, done). It writes only to the linked task, it never writes to a task found only by place, and each comment ends with the agent signature line: `_An agent wrote this comment through the ops CLI (Orbh session <session id>)._` See § Work Tied To An Operations Task above.
 
@@ -308,13 +424,16 @@ The callouts of the workflows set these phases:
 | [[dev-wkfl-ops-plan_layout]] | `reading-plan`, `placing-steps` |
 | [[dev-wkfl-ops-backlog_triage]] | `reading-backlog`, `applying` (Apply mode only) |
 | [[dev-wkfl-ops-deliverable_setup]] | `reading-scope`, `creating` |
+| The task workflows ([[dev-wkfl-ops-create_task]], [[dev-wkfl-ops-scope_task]], [[dev-wkfl-ops-do_task]], [[dev-wkfl-ops-create_and_do_task]], [[dev-wkfl-ops-review_task]], [[dev-wkfl-ops-do_task_group]]) | `reading-task`, `creating-task`, `implementing`, `reviewing`, `resolving`, `blocked`, `complete` |
+
+For the task workflows, also set `flint orbh session set progress "<done>/<total> checks"`.
 
 ## Result Delivery
 
-End every turn with `flint orbh session return --finish "<result>"`. Write the result in ASD-STE100 style. Include:
+End every turn with `flint orbh session return --finish "<result>"`, when no parent frame is open. Write the result in ASD-STE100 style. Include:
 
 - The mode (dev or prod data) and the organisation.
-- Every record that you created, changed, or deleted: kind, ID, address, and title.
+- Every record that you created, changed, or deleted: kind, ID, address, and title. For a task, also the path of its task note.
 - Every refusal, with its error code.
 - Test records that remain, if any.
 - A web link for the main record, when one helps.

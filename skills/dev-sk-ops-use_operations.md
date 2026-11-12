@@ -121,7 +121,7 @@ Use the first command that fits. `ops <noun> <verb> --help` gives the flags and 
 | **Find** places, tasks, people | `ops headers`, `ops search "<text>"`, `ops task list [--section\|--project\|--deliverable\|--deployment\|--master\|--mine\|--all\|--unplaced] [--status open\|todo\|doing\|done\|all]`, `ops task related <kind> <ref>` (the tasks of a repo, a Flint, a project, a deliverable, or an address), `ops member list`, `ops people search\|show`, `ops address <record>` |
 | **See the overview** | `ops home stats` (the counts of the homepage), `ops home recents`, `ops home activity`, `ops home brief <project>` |
 | **Read** one record | `ops project\|deliverable\|section\|deployment\|plan\|deadline\|blocker\|notepad show <ref>`, `ops task show\|context\|map <task>`, `ops backlog show [--project <p>]`, `ops deployment inbox <d> --open` (the inbox only), `ops deployment sections <d>` (its other sections), `ops deliverable status <d>` (the derived status of a deliverable and its sections; `deliverable done` is the person's mark and wins), `ops comment count <tasks...>` |
-| **Create** a task | `ops task create "<title>" --section\|--project\|--deliverable\|--deployment\|--parent <ref>` (or `--route`, `--master`, `--unplaced`); `--repo <name>` adds a `repo` related link ([[dev-sk-ops-create_task]]); the inbox Add of the web app: `ops deployment add <d> "<title>" --tag hotfix` (it makes the inbox when it is absent; `--every week` alone gives the tag `recurring`) |
+| **Create** a task | In a Flint: `flint shard ops task-new "<title>" --section\|--project\|--deliverable\|--deployment\|--parent <ref>` (or `--master`, `--unplaced`): a task note and an Ops task, linked both ways ([[dev-sk-ops-create_task]], [[dev-init-ops]] § Tasks: the Task Note and the Ops Task); `--repo <name>` adds a `repo` related link. An Ops task alone, for a planning write of many tasks: `ops task create "<title>" <place>` (or `--route`); the inbox Add of the web app: `ops deployment add <d> "<title>" --tag hotfix` (it makes the inbox when it is absent; `--every week` alone gives the tag `recurring`) |
 | **Link** outside records to a project | `ops project link <project> <uri...>` (NUU Connect URIs `nuu://<app>/<type>/<id>`; each URI one time; at most 50; `--json` gives `{id, connectRefs}`), `ops project unlink <project> <uri>` (a missing URI changes nothing) |
 | **Create** a place | `ops project create [--deployment <d>]`, `ops deliverable create <title> --project <p>`, `ops section create <title> --project\|--deliverable\|--deployment <ref>`, `ops deployment create <name> --project <p>` |
 | **Change** a task | `ops task update <task> --title\|--body\|--priority\|--assign\|--tag\|--every`, `ops task start\|done\|reopen\|close\|result <task>` (a task has no outcome: `close` takes only `--result`) |
@@ -185,7 +185,7 @@ Each recipe uses `--org <org>` when the org is not the active one. Use `--json` 
 2. **Create a task where it belongs.**
    ```bash
    ops route "Fix the login bug on Safari" --json      # ranked places; a score below 0.3 fits nothing
-   ops task create "Fix the login bug on Safari" --section <sectionId> --priority high --assign me
+   flint shard ops task-new "Fix the login bug on Safari" --section <sectionId> --priority high --assign me --body-file <file>
    ```
 3. **Move tasks into a section.**
    ```bash
