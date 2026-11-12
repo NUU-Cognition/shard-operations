@@ -1,5 +1,5 @@
 ---
-description: "Complete reference for the ops CLI after the revamp of ops-command-1021 — the model, a first session, install, modes, sign-in, the default org, references (IDs, addresses, URLs, titles, paths), places of --to, output and exit codes, every command family (headers, route, search, section, task with subtasks and the map, deliverable done, deployments and the inbox, blockers, notepads, the day plan, Trident streams and workspaces, shares, holds, calendars and events, agent sessions at Ops objects and the agent defaults), the read query (ops query), ops call, ops ops, and the undo guard"
+description: "Complete reference for the ops CLI after the revamp of ops-command-1021 — the model, a first session, install, modes, sign-in, the default org, references (IDs, addresses, URLs, titles, paths), places of --to, output and exit codes, every command family (headers, route, search, section, task with subtasks and the map, deliverable done, deployments and the inbox, blockers, notepads, the day plan, Trident streams and workspaces, shares, holds, calendars and events, agent sessions at Ops objects and the agent defaults, images and videos in Updates with ops media), the read query (ops query), ops call, ops ops, and the undo guard"
 orbh-sessions:
   - "[[3fb6e594-a179-4c0b-ba67-833b2ccaea67]]"
   - "[[4c4eadb7-6e8e-4529-8186-3bb1b5bdbc75]]"
@@ -484,6 +484,47 @@ open). The attachments of a group show on each of its tasks.
 | `ops comment unreact <task> <commentId> <emoji>` | `ops comment unreact "Write docs" <commentId> 👍` |
 | `ops comment count <tasks...>` — `updates.count`: the comment counts of many tasks | `ops comment count <a> <b>` |
 | `ops comment people` — `updates.people`: the people that you can mention in a comment | `ops comment people --json` |
+
+### media (images and videos in Updates)
+
+An Update (a comment on a task) can show images and videos (fleet storage-1112, Repos/main 3433bbdee1). `ops media attach` uploads local files to NUU Storage, confirms each one, and posts one Update with an embed on each line: `![[ops-media:<fileId>]]`. A comment body holds the embed only, never a URL. A media file belongs to one task: only the Updates of that task show it. The model is in [[dev-knw-ops-data_model]] § Media in Updates. The full reference of the CLI is `apps/cli-ops/docs/media.md` in the monorepo.
+
+| Command | Example |
+|---|---|
+| `ops media attach <task> <path...> [--body <text>\|-] [--body-file <path>] [--no-comment] [--no-ffmpeg]` — for each path in order: check the type and the size, prepare a video with ffmpeg, `media.begin`, `PUT`, `media.confirm`; then one Update (`updates.add`): the text, a blank line, and one embed on each line in the order of the paths | `ops media attach "Fix the login bug" before.png after.png --body "The fix: before and after."` |
+| `ops media list <task>` — `media.list`: the files of a task, newest first: the ID, the name, the kind, the size, the pixel size, the duration, the poster, the state (`pending`, `live`, `detached`), the number of Updates that hold it, and the time. No URL | `ops media list <taskId> --json` |
+| `ops media url <task> <fileId...>` — `media.readUrls`: the signed read URLs (`url`, `download`, `poster`) of 1 to 100 files, valid 1 to 2 hours. The only command that prints a URL | `ops media url <taskId> <fileId> --json` |
+| `ops media get <task> <fileId> [-o, --output <path\|folder/>] [--force]` — download one file (default: its stored name in the current folder); it refuses to replace a file without `--force` | `ops media get <taskId> <fileId> -o ~/Downloads/` |
+| `ops media detach <fileId>` — `media.detach`: release a file that no Update holds (only its uploader) | `ops media detach <fileId>` |
+
+- **The IDs.** `<task>` is a task ID, an address, a web URL, or a title. `<fileId>` has 20 characters (`a` to `z`, `0` to `9`); the commands also take `ops-media:<fileId>` and the embed.
+- **The files.** An image: PNG, JPEG, GIF, WebP, or AVIF, at most 20 000 000 bytes. A video: MP4, WebM, or MOV, at most 100 000 000 bytes. The CLI finds the type from the bytes, then from the extension, and checks the type and the size before any network call. HEIC and MKV are not permitted: convert a HEIC photo to JPEG first (`sips -s format jpeg photo.heic --out photo.jpg` on macOS), and copy an MKV to MP4 (`ffmpeg -i in.mkv -c copy out.mp4`). A name has 1 to 200 characters.
+- **The options.** `--body -` reads the text from stdin. Give `--body` or `--body-file`, not both. `--no-comment` posts no Update and prints the embeds for `ops comment add`; `--body` with `--no-comment` is a usage error. The body of an Update has at most 10 000 characters (one embed is 35).
+- **ffmpeg.** With `ffmpeg` on PATH (no ffprobe needed), `attach` reads the width, the height, and the duration of a video, moves the `moov` box of an MP4 or a MOV to the start (`-c copy -movflags +faststart`: no new encode, so the browser plays the video before the full download), and makes a JPEG poster at 1 second (at most 1280 pixels wide, at most 1 000 000 bytes). A failed step prints a notice and continues. Without ffmpeg, or with `--no-ffmpeg`, a video goes as it is, and stderr has one notice: `ffmpeg is not on PATH: the video goes as it is (no faststart, no poster).` A notice is not an error.
+- **The output.** Progress goes to stderr, never to stdout. The text lines: `attached <name> (<kind>, <size>) -> ![[ops-media:<fileId>]]`, then `added comment <commentId>  on task <taskId>`. `--json` gives exactly one document: `{ taskId, orgSlug, commentId?, files: [{ id, name, kind, mime, size, width?, height?, durationMs?, poster, embed, faststart }], notices? }`. `commentId` is absent with `--no-comment`.
+- **A failure.** When a step fails after a file of the run began, or on Ctrl-C, the command detaches each file of the run, and it prints each file that it could not detach with its `ops media detach` command. Nothing is posted.
+- **Signed URLs.** A URL gives each person who has it access to the file for 1 to 2 hours. Do not put a URL in a comment, a result, a log, or a Mesh note. To show a file, put its embed in a comment. No output and no error holds a signed upload URL.
+- **Read the media of a comment.** `ops comment list` shows the body as it is stored, with the embed as text. `ops task context <task> --json` gives `media: [{ id, name, kind, mime, size }]` on each comment that holds a live embed (the text view prints no media line). Then `ops media get` downloads a file, or `ops media url` gives its URL.
+- **Text and media by hand.** `ops media attach <task> <path> --no-comment --json` gives `files[].embed`. Then `ops comment add <task> -` with the text and the embeds on stdin. An edit of a comment that drops an embed, or a delete of the comment, detaches the file.
+- **The connector.** An embedded run (the NUU MCP connector) refuses `attach` and `get` with `embed_unsupported`: they read or write local files.
+- **Exit codes**: 0 success, 1 a refusal of the service, 2 a usage error or a local refusal (nothing was sent), 3 no sign-in, 4 a network failure (an upload goes again two times first).
+
+| Code | Exit | What to do |
+|---|---|---|
+| `media_file_unreadable`, `media_file_empty` | 2 | Check the path, and give a complete file |
+| `media_type_unsupported`, `media_too_large` | 2 or 1 | Convert the file to a permitted type, or make it smaller |
+| `media_quota_org`, `media_task_full` | 1 | Detach the files that no Update holds, or tell the operator (10 000 000 000 bytes for each org; 500 files for each task) |
+| `media_quota_daily` | 1 | 1 000 000 000 bytes or 200 files for each person in 24 hours: wait, then run the command again |
+| `media_invalid` | 1 | The service refused a field (the name, the width, the height): read the message |
+| `media_storage_unconfigured` | 1 | The deployment has no media storage: tell the operator, and do not run the command again |
+| `media_upload_refused`, `media_upload_failed`, `media_upload_missing`, `media_upload_mismatch`, `media_file_changed` | 1 | The upload did not arrive whole (a 4xx, three 5xx, no bytes, a wrong size or type, or a file that changed): run the command again; a 413 or 415 is a wrong size or type |
+| `media_not_found` | 1 | The ID is not a live file of the task: `ops media list <task>` |
+| `media_in_use` | 1 | `detach` of a file that an Update holds: edit the Update to remove the embed, or delete the Update |
+| `media_download_failed`, `media_download_incomplete` | 1 | Run `ops media get` again: it asks for a new URL |
+| `file_exists` | 2 | The target of `get` exists: give another `-o`, or add `--force` |
+| `view-only` | 1 | You can read the task but not comment on it: ask for the editor share |
+| `agent_unknown_operation` | 1 | The deployment has no media ops yet: ask the operator for the deploy |
+| `interrupted` | 1 | Ctrl-C: the files of the run are detached; run the command again |
 
 ### backlog
 

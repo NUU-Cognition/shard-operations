@@ -1,5 +1,5 @@
 ---
-description: "The NUU Operations data model — the places (org, project, deliverable, section, deployment), tasks and subtasks, the task primitive, the task map, the blockers, the hidden context, the headers, the route decision, the addresses, Trident streams and workspaces, shares, holds, calendars and events, agent sessions at Ops objects and the agent defaults, the named sections, every field as the backend names it, the rules of each mutation, undo and Waybill, and the error codes"
+description: "The NUU Operations data model — the places (org, project, deliverable, section, deployment), tasks and subtasks, the task primitive, the task map, the blockers, the hidden context, the headers, the route decision, the addresses, Trident streams and workspaces, shares, holds, calendars and events, agent sessions at Ops objects and the agent defaults, media in Updates (images and videos), the named sections, every field as the backend names it, the rules of each mutation, undo and Waybill, and the error codes"
 orbh-sessions:
   - "[[3fb6e594-a179-4c0b-ba67-833b2ccaea67]]"
   - "[[4c4eadb7-6e8e-4529-8186-3bb1b5bdbc75]]"
@@ -1129,6 +1129,31 @@ Module `updates` (a Webcore component). Only tasks carry comments. A comment tar
 | `updates.people` | `orgSlug` |
 
 A mention is `{id: "user:<clerkUserId>", name, handle?}`. Comments are not in Waybill, so undo does not reach them. The owner, the creator, and the people looped into the task (§ Looped In) get `update.comment`; a mentioned person gets `update.mention`. A mention of a member of the org loops that member into the task. Errors: `updates_target`, `updates_tenant`, `task_not_found`.
+
+## Media in Updates
+
+An Update (a comment on a task, `updates.add`) can show images and videos (fleet storage-1112). The bytes are in NUU Storage (Cloudflare R2 through the Worker `nuu-storage`), not in Convex. Ops keeps one row for each file in the table `media_files`.
+
+- **The embed.** A comment body holds `![[ops-media:<fileId>]]` on its own line, never a URL. `fileId` has 20 characters `[a-z0-9]`. The editor target is `ops-media:<fileId>`. A reader matches `/!\[\[ops-media:([a-z0-9]{20})(?:\|[^\]\n]*)?\]\]/g` (an alt part after `|` is permitted and ignored).
+- **One task.** A media file belongs to one task. Only the Updates of that task show it. The row keeps the task by its stable `restoreKey` (`taskKey`) as well as its id, because an undo of a delete gives the task a new id.
+- **The fields** of `media_files`: `orgSlug`, `taskKey`, `taskId`, `uploader` (the actor), `key` (the storage key `ops/<orgSlug>/<fileId>`), `name`, `mime`, `kind` (`image` or `video`), `size`, `width?`, `height?`, `durationMs?`, `posterKey?` (`ops/<orgSlug>/<fileId>.poster.jpg`), `state` (`pending`, `live`, or `detached`), `createdAt`, `confirmedAt?`, `detachedAt?`. The table `media_usage` counts the quota.
+- **The lifecycle.** `media.begin` makes a `pending` row and gives a signed upload URL (valid 15 minutes). The client sends the bytes with `PUT`. `media.confirm` reads the object (HEAD), checks the size and the type, and makes the row `live`. `updates.add` attaches each live file whose embed is in the body. An edit that drops the embed, a delete of the comment, or `media.detach` makes the row `detached`. A cron removes a `pending` row after 24 hours and a `detached` row (with its objects) after 30 days.
+- **The limits** (`MEDIA` of `@nuucognition/storage`): an image (`image/png`, `image/jpeg`, `image/gif`, `image/webp`, `image/avif`) at most 20 000 000 bytes; a video (`video/mp4`, `video/webm`, `video/quicktime`) at most 100 000 000 bytes; a poster (`image/jpeg`) at most 1 000 000 bytes. The quota: 10 000 000 000 bytes for each org (pending and live); 1 000 000 000 bytes and 200 files for each person in 24 hours; 500 files for each task.
+- **Access.** An upload needs the comment gate of the task: an org member, or a share viewer with Editor. A read URL needs the read gate: an org member, or a share viewer with Reader. Each row must match the org of its task.
+- **The agent context.** `agent.taskContext` (`ops task context`) gives each comment with embeds the list `media: [{ id, name, kind, mime, size }]`, with no URL. `media.readUrls` gives the URLs.
+- **The web.** The composer of an Update takes a paste, a drop, or a pick of a file, and uploads it with progress. The timeline shows an image in a box of its aspect ratio (lazy load, a click opens a lightbox), and a video with controls, its poster, and a download link for a codec that the browser cannot play.
+
+| Op | Kind | Args | Result |
+|---|---|---|---|
+| `media.begin` | mutation | `{ taskId, name, mime, size, width?, height?, durationMs?, posterSize? }` (`size` is the exact byte count of the PUT) | `{ fileId, kind, embed, target, uploadUrl, contentType, expiresAt, posterUploadUrl? }` |
+| `media.confirm` | action | `{ fileId }` (only the uploader) | `{ id, taskId, name, kind, mime, size, width?, height?, durationMs?, poster, embed, target, state: "live" }`; a second confirm gives the same result |
+| `media.readUrls` | query | `{ taskId, ids (1 to 100), window? }` | `{ items: [{ id, name, kind, mime, size, …, url, downloadUrl, posterUrl?, expiresAt }], missing }` |
+| `media.list` | query | `{ taskId }` | `{ items: [{ id, name, kind, mime, size, …, poster, state, createdAt, uploader, inUpdates }], truncated }`, newest first, no URL |
+| `media.detach` | mutation | `{ fileId }` (the uploader; no Update holds the file) | `{ detached }` |
+
+The upload is HTTP, not a gateway op: `PUT <uploadUrl>` with `Content-Type: <contentType>` (exact) and `Content-Length` (exact, equal to `size`), and no `Authorization` header (the token is in the URL). Success is HTTP 201 with `{ key, size, etag, contentType }`. Never print a signed URL: it holds a token.
+
+Error codes: `media_invalid`, `media_type_unsupported`, `media_too_large`, `media_quota_org`, `media_quota_daily`, `media_task_full`, `media_storage_unconfigured`, `media_not_found`, `media_upload_missing`, `media_upload_mismatch` (the file is released: begin again), and `media_in_use`.
 
 ## Notifications
 

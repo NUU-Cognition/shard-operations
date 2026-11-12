@@ -75,6 +75,7 @@ You can run this workflow as a shard invocation. The invocation is a durable rec
   ops task result <address> "<what the work gave, in two or three sentences>. Tests: <…>. Commits: <sha> (<repo>), …. Session: $ORBH_SESSION_ID"
   ```
 - Check the result: `task.result` of `ops task show <address> --json` names each commit.
+- **Show a visual result.** When the work changed something that a person sees (a page, a chart, a UI), attach a screenshot or a short screen recording to the task: `ops media attach <address> <file...> --body "<what it shows>" --json`. Keep the files in the scratch folder, not in the Mesh. Never put a signed URL in the result or in a comment.
 - Copy the state into the note: `flint shard ops task-sync <address>`. Add a last `# Task Log` line with the result.
 - **Ask for the review in Ops.** Each finished task gets exactly one review request, after its result and before any close. The work is finished when each item of the definition of done is met. Do not wait for the person to ask for it:
   ```bash
