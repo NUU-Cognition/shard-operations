@@ -477,7 +477,7 @@ open). The attachments of a group show on each of its tasks.
 | Command | Example |
 |---|---|
 | `ops comment list <task> [--events] [--limit n]` | `ops comment list "Write docs" --events` |
-| `ops comment add <task> <body\|->` | `ops comment add "Write docs" "First draft is up."` |
+| `ops comment add <task> <body\|-> [--mention <person>]...` — `--mention` (repeat) mentions a person of the org of the task (a handle, a name, or an ID from `ops comment people`); the person gets a notification, and the CLI adds the missing `@<handle>` token at the end of the body | `ops comment add "Write docs" "@ana The draft is up." --mention ana` |
 | `ops comment edit <task> <commentId> <body\|->` | `ops comment edit "Write docs" <commentId> "Second draft."` |
 | `ops comment delete <task> <commentId>` | `ops comment delete "Write docs" <commentId>` |
 | `ops comment react <task> <commentId> <emoji>` | `ops comment react "Write docs" <commentId> 👍` |
