@@ -25,7 +25,7 @@ Load this shard when a request touches Operations records: projects, deliverable
 
 **Start here: [[dev-sk-ops-use_operations]].** It is the main skill of this shard. It gives the model, the builds and the sign-in, the org, references and places, the command for each job, `ops query` and `ops call` for any other read or write, seventeen recipes, the safety rules, and troubleshooting. Follow it for any Operations request. The other skills and workflows go deeper on one job.
 
-**Tasks have two parts.** Each task that this shard makes has a task note in this Flint (the content) and an Ops task (the state), linked both ways. Make each task with `flint shard ops task-new`, and do it with the task workflows. § Tasks: the Task Note and the Ops Task gives the rules. Before you create, do, or close a task, read [[dev-knw-ops-task_model]] and [[dev-knw-ops-task_cli]]. Since Operations 0.8.0 this shard holds the work of the former Tasks shard (`task`), which is deprecated.
+**Tasks have two parts.** Each task that this shard makes has a task note in this Flint (the content) and an Ops task (the state), linked both ways. Make each task with `flint shard ops task-new`, and do it with the task workflows. § Tasks: the Task Note and the Ops Task gives the rules. Before you create, do, or close a task, read [[dev-knw-ops-task_model]] and [[dev-knw-ops-task_cli]]. Since Operations 0.8.0 this shard holds the work of the former Tasks shard (`task`). The Tasks shard is deprecated, and the migration or the setup of this shard uninstalls it.
 
 ## The Projects of This Flint
 
@@ -256,7 +256,7 @@ Each task workflow has an invocation file (`wkfl-ops-<name>.invocation.json`, fo
 - Mark each step with `flint shard step done <step> --evidence "<…>"`, or skip it with `flint shard step skip <step> --reason "<why>"`. Outside an Orbh session, add `--invocation <id>`.
 - Close the invocation with `flint shard invocations close <id> --outcome done` when the workflow is finished. Only a `done` close prints the next workflow.
 - Inside another open frame, a task workflow is a child frame. After its `done` close, continue the parent frame: do not close the session, and do not return in a headless session.
-- An invocation that a session opened with the former Tasks shard (`flint shard invoke task …`) stays a record of that shard: continue it there, or close it with `--outcome abandoned` and open a new one here.
+- An invocation that a session opened with the former Tasks shard (`flint shard invoke task …`) stays a record of that shard. After the Tasks shard is uninstalled, it cannot continue: close it with `--outcome abandoned`, and open a new one here.
 - When no invocation is open, follow the stages with no record.
 
 ## Web Links

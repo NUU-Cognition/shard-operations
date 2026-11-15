@@ -22,4 +22,4 @@ setup: flint
 # uses the type Task and the template tmp-proj-task-v0.2 of the Projects
 # shard (the dependency above). The task scripts (task-new, task-link,
 # task-sync) and their knowledge came from the Tasks shard 0.6.0, which is
-# deprecated since Operations 0.8.0.
+# deprecated since Operations 0.8.0. The migration and the setup uninstall it.

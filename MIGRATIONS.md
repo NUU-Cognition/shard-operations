@@ -9,8 +9,9 @@ One agent migration: `mig-ops-0.7.0-to-0.8.0`. Run `flint shard migrate run ops`
 - The update needs the Projects shard `^1.6` (a dependency now). `flint shard install` and `flint shard update` install it first.
 - The spec of a Flint that pins `@nuucognition/operations@^0.7` does not take 0.8.0: run `flint shard install @nuucognition/operations@^0.8`.
 - The setup is `required` after the update: run `flint shard ops projects-note`, then `flint shard setup ops --complete` (the migration does it).
-- A Flint that has the Tasks shard keeps it. The migration rewrites `flint shard start task`, `flint shard task task-new|task-link|task-sync`, `flint shard invoke task <workflow>`, and the links `[[wkfl-task-*]]`, `[[sk-task-*]]`, `[[knw-task-*]]` in the `(System)` files of the Mesh and in `CLAUDE.md` and `AGENTS.md`. Records (task notes, reports, notepads, the archive) keep the old names.
-- An open invocation of the Tasks shard stays a record of that shard: continue it there, or close it with `--outcome abandoned`.
+- The migration rewrites `flint shard start task`, `flint shard task task-new|task-link|task-sync`, `flint shard invoke task <workflow>`, and the links `[[wkfl-task-*]]`, `[[sk-task-*]]`, `[[knw-task-*]]` in the `(System)` files of the Mesh and in `CLAUDE.md` and `AGENTS.md`. Records (task notes, reports, notepads, the archive) keep the old names.
+- The migration uninstalls the Tasks shard (the operator decision of 2026-11-16). First it closes each open invocation of the Tasks shard whose session has ended (`--outcome abandoned`). An invocation of a live session stays open, and the uninstall waits for it. A Flint that holds the source of the Tasks shard keeps the source, with `use = "none"`.
+- A new install of Operations 0.8.0 into a Flint that has the Tasks shard runs no migration. The setup (step 4 of `setup-ops.md`) then does the rewrite and the uninstall.
 
 ---
 

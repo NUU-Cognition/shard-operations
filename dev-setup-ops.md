@@ -31,12 +31,15 @@ The setup scope is `flint`: one setup for each Flint. The state is in the commit
 
    The shard works with no projects note. When the read fails, finish the setup anyway, and put the reason in your report. The next session can run `flint shard ops projects-note` again.
 
-4. The note is a Mesh file. Commit it with the other files of your work, and commit only your own paths.
+4. **Remove the Tasks shard.** Do this step when `flint shard list` has a row with the shorthand `task` and the package `@nuucognition/tasks`. This happens after a new install of Operations into a Flint that had the Tasks shard and no Operations 0.7.0: then the migration [[dev-mig-ops-0.7.0-to-0.8.0]] does not run. Do its steps 2, 3, and 4: rewrite the commands and links of the Tasks shard in the instruction files of the Flint, then uninstall the Tasks shard. After the migration, the row is gone, and this step does nothing.
+
+5. The note is a Mesh file. Commit it with the other files of your work (also the changed instruction files and `flint.toml`), and commit only your own paths.
 
 # Verification
 
 - `Mesh/(System) Ops Projects.md` exists, with the tag `#ops/projects` and the field `updated`.
 - The note has the section `## Projects of This Flint`, or the section `## Status` with the reason of a failed read. A note with `complete: false` names each failed read.
+- `flint shard list` has no row with the shorthand `task` and a build, unless step 4 found an open invocation of a live session (then name it in your report).
 
 Then mark the setup complete:
 
