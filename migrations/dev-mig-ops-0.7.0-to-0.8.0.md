@@ -55,4 +55,4 @@ Run each check. When one fails, stop and report. Do not finish the migration.
 4. `flint shard setup ops` shows the Flint layer `completed`.
 5. `flint shard list` has no row with the shorthand `task` and a build. A row of a source with the state `no build` is correct. The one exception is an open invocation of a live session (step 4.2): then name it in your report.
 
-Then run `flint shard migrate finish ops`. Check that `flint shard status ops` prints `No pending migrations` and the version `0.8.0`.
+Then run `flint shard migrate finish ops`. Then run `flint shard migrate run ops` again: it runs the script steps after this step (for example `mig-ops-0.8.0-to-0.8.1`). Check that `flint shard status ops` prints `No pending migrations` and the version of the build (`0.8.1` or a later version).

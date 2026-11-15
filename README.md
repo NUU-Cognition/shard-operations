@@ -68,6 +68,7 @@ Shards/(Source Remote) Operations/
     dev-projects-note.js                                  # the projects note
   migrations/
     dev-mig-ops-0.7.0-to-0.8.0.md        # from the Tasks shard to Operations 0.8.0
+    dev-mig-ops-<from>-to-<to>.js        # 0.1.0 to 0.7.0, and 0.8.0 to 0.8.1: script steps that do nothing; they keep the chain complete
 ```
 
 Load the build with `flint shard start ops`, in an interactive session and in a headless session. Load the source with `flint shard start-dev ops` only to edit it. A headless session follows the `> [!headless]` callouts of the workflows.

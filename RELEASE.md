@@ -1,3 +1,11 @@
+# 0.8.1
+
+The migration chain is complete (the operator report of 2026-11-16: the install into a Flint at 0.3.2 failed with `Migration chain for shard "ops" is incomplete: no migration file starts at 0.3.2`).
+
+- **Twelve script steps that do nothing** (`dev-mig-ops-<from>-to-<to>.js`, `process.exit(0);`): one for each version from 0.1.0 to 0.7.0, and one from 0.8.0 to 0.8.1. A Flint at each older version now goes to 0.8.1: the script steps run, and the agent step `mig-ops-0.7.0-to-0.8.0` stops for the agent. No version before 0.8.0 installed a file into the Mesh, so these steps change nothing.
+- **The rule of the chain** in `MIGRATIONS.md`: each release adds one step from the version before it. When the release changes nothing in the Flint, the step is a script that does nothing.
+- No other change: the init, the skills, the workflows, the knowledge, and the scripts are the same as in 0.8.0.
+
 # 0.8.0
 
 The Tasks shard merges into Operations, and the shard gets the projects note (the fleet storage-1112, the operator request of 2026-11-12). One shard now does each task verb: it makes the task note in the Flint and the task in Ops, linked both ways.
