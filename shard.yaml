@@ -3,7 +3,7 @@ shard: "@nuucognition/operations"
 id: 132d001d-1972-4c14-8326-3598bd1fe00d
 source:
   id: 54a9b195-c150-4fb5-bd93-9d3e66536009
-version: "0.8.1"
+version: "0.8.2"
 name: Operations
 shorthand: ops
 description: Work in NUU Operations through the ops CLI — the main skill sk-ops-use_operations; tasks in two parts (a Flint task note and an Ops task, linked both ways) with the workflows create task, scope task, do task, create and do task, review task, and do task group; the projects note of the Flint; images and videos in Updates (ops media); projects, deliverables, sections, subtasks, task groups, the review queue, the people looped in, Trident streams and workspaces, shares, holds, calendars and events, agent sessions at Ops objects and the agent defaults, deployments and their inboxes, the route decision, addresses, deadlines, blockers, plans and the plan canvas, notepads, day plans, and ops query.
@@ -22,4 +22,5 @@ setup: flint
 # uses the type Task and the template tmp-proj-task-v0.2 of the Projects
 # shard (the dependency above). The task scripts (task-new, task-link,
 # task-sync) and their knowledge came from the Tasks shard 0.6.0, which is
-# deprecated since Operations 0.8.0. The migration and the setup uninstall it.
+# deprecated since Operations 0.8.0. The setup uninstalls it. The shard has
+# no migration files: the setup does the one-time work in each Flint.

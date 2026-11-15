@@ -2,7 +2,18 @@
 
 Migration notes for Operations. Latest version at top, separated by `---`.
 
-The chain of steps in `migrations/` must be complete: the CLI finds the step that starts at the installed version, then the step that starts at its end, until it gets to the new version. When one version has no step, the install and the update fail with `Migration chain for shard "ops" is incomplete`. Thus each release adds one step from the version before it. When the release changes nothing in the Flint, the step is a script that does nothing (`dev-mig-ops-<from>-to-<to>.js` with `process.exit(0);`). `flint shard migrate run ops` runs a script step and does not stop.
+Since 0.8.2 the shard has no migration files and no `migrations/` folder. Do not add one. The CLI checks the chain of steps only when the folder has files: then it needs one step from each old version, and a gap makes each install and each update fail (`Migration chain for shard "ops" is incomplete`). The one-time work in a Flint is in the setup ([[dev-setup-ops]]).
+
+## 0.8.2
+
+No migration files. A Flint at each older version updates to 0.8.2 directly: `flint shard update operations`.
+
+- An update from 0.8.0 or 0.8.1: no work. The setup stays complete.
+- An update from a version below 0.8.0 (for example 0.3.2 or 0.7.0): those versions had no setup, so the setup becomes `required`, and `flint shard start ops` refuses until the setup is complete. Do the setup ([[dev-setup-ops]]): it writes the projects note, rewrites the commands and links of the Tasks shard in the instruction files of the Flint, and uninstalls the Tasks shard. Then run `flint shard setup ops --complete`.
+- The spec in `flint.toml` must accept 0.8.2. An exact spec or a range below 0.8 (`^0.3`, `^0.7`) does not take it: run `flint shard install @nuucognition/operations@^0.8`, then `flint shard update operations`.
+- A Flint with queued steps of 0.8.0 or 0.8.1 (`flint shard migrate show ops` lists them) keeps them after the update, and `flint shard start ops` refuses: no command runs a step that the build does not have. Do the steps first with 0.8.1: `flint shard install --from-git 'NUU-Cognition/shard-operations#v0.8.1' --alias operations`, then `flint shard migrate run ops` (and `finish` and `run` again for an agent step). Then update.
+
+---
 
 ## 0.8.1
 

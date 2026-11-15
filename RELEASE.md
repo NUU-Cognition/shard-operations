@@ -1,3 +1,12 @@
+# 0.8.2
+
+No migration files (the operator decision of 2026-11-16). The update from an older version fails no more, and it needs no migration step.
+
+- **The `migrations/` folder is gone**: the agent step `mig-ops-0.7.0-to-0.8.0` and the twelve script steps of 0.8.1. The CLI checks no chain when a shard has no migration files, so a Flint at each older version (for example 0.3.2) updates to 0.8.2 directly.
+- **The setup does the one-time work.** Step 4 of `setup-ops.md` has the full steps of the former migration: it finds the instruction files that name the Tasks shard, rewrites each command and link with the table of the new names (§ The New Names), closes the open invocations of the Tasks shard whose session ended, and uninstalls the Tasks shard. A Flint from a version below 0.8.0 had no setup, so its setup becomes `required` after the update: `flint shard start ops` refuses until the setup is complete.
+- The prerequisites of the setup check that the Projects shard has a version of 1.6 or more. The verification checks that no instruction file names the old commands.
+- No other change: the init (one sentence), the skills, the workflows, the knowledge, and the scripts are the same as in 0.8.1.
+
 # 0.8.1
 
 The migration chain is complete (the operator report of 2026-11-16: the install into a Flint at 0.3.2 failed with `Migration chain for shard "ops" is incomplete: no migration file starts at 0.3.2`).

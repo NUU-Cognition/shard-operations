@@ -19,7 +19,7 @@ The source moved from the NUU Operations Flint to the NUU Flint on 2026-10-21 (o
 
 Version 0.3.0 (ops-cli-publish-1023) adds the main skill `sk-ops-use_operations`: an agent with no other context can do Operations work with it.
 
-Version 0.8.0 (storage-1112) merges the Tasks shard into Operations: the task workflows (create task, scope task, do task, create and do task, review task, do task group), the task skills, the task knowledge, and the task scripts `task-new`, `task-link`, and `task-sync`. Each task that the shard makes has a task note and an Ops task, linked both ways. The shard depends on the Projects shard (the type `Task` and the template `tmp-proj-task-v0.2`). It adds a setup (`setup: flint`) and the script `projects-note`, which writes the Mesh note `Mesh/(System) Ops Projects.md`: the projects of the Ops org that matter to the Flint. The Tasks shard is deprecated: it stays published, and the migration or the setup of 0.8.0 uninstalls it from the Flint.
+Version 0.8.0 (storage-1112) merges the Tasks shard into Operations: the task workflows (create task, scope task, do task, create and do task, review task, do task group), the task skills, the task knowledge, and the task scripts `task-new`, `task-link`, and `task-sync`. Each task that the shard makes has a task note and an Ops task, linked both ways. The shard depends on the Projects shard (the type `Task` and the template `tmp-proj-task-v0.2`). It adds a setup (`setup: flint`) and the script `projects-note`, which writes the Mesh note `Mesh/(System) Ops Projects.md`: the projects of the Ops org that matter to the Flint. The Tasks shard is deprecated: it stays published, and the setup uninstalls it from the Flint. Since 0.8.2 the shard has no migration files: the setup does the one-time work in each Flint.
 
 Version 0.7.0 (total-orchestration-1111) adds agent sessions at Ops objects: the duty of an agent session at a task, a section, a deliverable, or a project, the two ways to speak to it (a comment on a task, or the chat), `ops agents`, and the agent defaults (`ops agents defaults` and `ops agents defaults set`).
 
@@ -66,9 +66,6 @@ Shards/(Source Remote) Operations/
     dev-task-new.js, dev-task-link.js, dev-task-sync.js   # the task notes
     dev-note-lib.js, dev-task-lib.js                      # their shared code
     dev-projects-note.js                                  # the projects note
-  migrations/
-    dev-mig-ops-0.7.0-to-0.8.0.md        # from the Tasks shard to Operations 0.8.0
-    dev-mig-ops-<from>-to-<to>.js        # 0.1.0 to 0.7.0, and 0.8.0 to 0.8.1: script steps that do nothing; they keep the chain complete
 ```
 
 Load the build with `flint shard start ops`, in an interactive session and in a headless session. Load the source with `flint shard start-dev ops` only to edit it. A headless session follows the `> [!headless]` callouts of the workflows.
