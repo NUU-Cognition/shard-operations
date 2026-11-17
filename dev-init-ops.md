@@ -57,7 +57,7 @@ Operations (Ops) is the delivery record of a person and of an organisation. The 
 11. **Trident** is the stream board. A **stream** is a lane of work with steps in zones (the shore and planned, active, done), parked steps, substreams, cross links to other streams, drawings, and the places that it serves. A **workspace** is a named set of streams of one person.
 12. A **share** gives another org or one person access to one record (`reader` or `editor`).
 9. **Blockers** say why work waits: what it waits on, the next step, an owner, and the next check-up date. A blocker links records and gates no status. It is open, resolved, or dropped.
-10. A task has no type, no stage, and no outcome: its state is its status and its result. The people **looped in** follow a task beside its owner and hear every comment. A **task group** is a set of tasks that are done together. A **day plan** is the ordered tasks of one person for one date.
+10. A task has no type, no stage, and no outcome: its state is its status and its result. The people **looped in** follow a task beside its owner and hear every comment. A **task group** is a set of tasks that are done together. A **day plan** is the ordered tasks of one person for one date. A task has a **do date**: the day on which the work is planned. A task that you do shows in the day plan of its do date. A done task has a **done date**.
 13. An **agent session** is at an Ops object (a task, a section, a deliverable, or a project) when it keeps that object as an item (`flint orbh objects add <address> --subscribe`). Its current object is its newest Ops item. A project and a deliverable hold the **agent defaults** of a new agent session: the Flint, the computer, the site, the profile, and the mode.
 
 ```
@@ -95,7 +95,9 @@ The service derives some states. A section is done when all its root tasks are d
 | Run a deployment | `ops deployment inbox|status|schedule|check|start-deliverable` |
 | Give a place its context | `ops project|deliverable|section|deployment context set` |
 | Record why work waits, and follow it up | `ops blocker create <title> --check <date> --on <record>`, `ops blocker list --due`, `ops blocker delay|resolve|drop` |
+| Plan when to do tasks | `ops task do <tasks...> --on <day|none>`, `ops day week`, `ops task list --do late|none|<day>..<day>` |
 | Plan your day | `ops day show|add|reorder|carry` |
+| Say when a task was done, or change the done date | `ops task done <task> --on <when>`, `ops task close <task> --on <when>` |
 | Show an image or a video in an Update of a task (a screenshot, a screen recording) | `ops media attach <task> <path...> --body "<text>" --json` (images at most 20 MB, videos at most 100 MB; [[dev-knw-ops-cli]] § media) |
 | Ask for a review of a task, give the verdict, read your queue | `ops task review request|approve|changes|dismiss|cancel <task>`, `ops review list` |
 | Run a lane of work on the Trident board | `ops stream list|show|create|update|attach`, `ops stream step add|add-task|move|park|shore`, `ops stream substream …`, `ops workspace …` |

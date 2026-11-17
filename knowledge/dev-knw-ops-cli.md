@@ -20,7 +20,7 @@ Source: `apps/cli-ops` in the NUU monorepo (package `@nuucognition/ops-cli`). Th
 
 - Most commands are `ops <noun> <verb>`. These top-level commands have no noun: `ops login`, `ops whoami`, `ops ops`, `ops call`, `ops headers`, `ops route`, `ops search`, `ops history`, `ops undo`, and `ops redo`. A dev build also has `ops mode`.
 - `--json` and `--org <slug|name|me>` work on every command, anywhere on the line. So no command has its own `--org` or `--version` option: a section of the org is `ops section create <title> --org-wide`, and the version label of a deployment is `--version-label`.
-- With `--json`, stdout holds exactly one JSON document and nothing else. Most lists print a JSON array, and an empty one prints `[]`: `org list`, `member list`, `project list`, `deliverable list`, `section list` (no scope, `--deliverable`, `--deployment`), `task list`, `deadline list`, `plan list`, `deployment list`, `favourite list`, `notepad list`, `notify prefs list`. Some print an object; read the named field: `section list --project` → `project`, `deliverables[].sections`, `deployments[].sections`; `headers` → `projects`, `deliverables`, `sections`, `deployments` (each with `address`), and `owner` (the org text of each address); `route` → `orgSlug`, `op` (`route.suggest` or `route.candidates`: the op that answered), `model` (`jev` or `text`), `latencyMs`, `intent`, and `candidates[]` (`place {kind, id, title, path}`, `score`, `confidence` when the model gave one, `reason`, `address`); `search` → `items[]` (`kind`, `id`, `title`, `path`, `address`, `status`), `truncated`; `task search` → `results` (with `truncated`); `task subtask list` → `task` (the tree), `total`, `done`; `task map` → `task`, `root`, `subtree`, `home`, `groups`, `lineage`, `related`, `url`; `deployment inbox` → `section`, `tasks`; `deployment show` → `deployment`, `inbox`, `inboxTasks`, `shipsHere`, `startedHere`; `backlog show` → `section` and `tasks` (before the revamp: `folders[].tasks`); `comment list` → `items` (with `hasMore`); `notify list` and `activity list` → `page` (with `isDone`, `continueCursor`); `history` and `plan history` → `undo` and `redo`; `ops ops` → `ops`; `notepad show` → `{notepad, blocks, tasks, markdown}`; `day show` → `items` (with `date`, `doneCount`).
+- With `--json`, stdout holds exactly one JSON document and nothing else. Most lists print a JSON array, and an empty one prints `[]`: `org list`, `member list`, `project list`, `deliverable list`, `section list` (no scope, `--deliverable`, `--deployment`), `task list`, `deadline list`, `plan list`, `deployment list`, `favourite list`, `notepad list`, `notify prefs list`. Some print an object; read the named field: `section list --project` → `project`, `deliverables[].sections`, `deployments[].sections`; `headers` → `projects`, `deliverables`, `sections`, `deployments` (each with `address`), and `owner` (the org text of each address); `route` → `orgSlug`, `op` (`route.suggest` or `route.candidates`: the op that answered), `model` (`jev` or `text`), `latencyMs`, `intent`, and `candidates[]` (`place {kind, id, title, path}`, `score`, `confidence` when the model gave one, `reason`, `address`); `search` → `items[]` (`kind`, `id`, `title`, `path`, `address`, `status`), `truncated`; `task search` → `results` (with `truncated`); `task subtask list` → `task` (the tree), `total`, `done`; `task map` → `task`, `root`, `subtree`, `home`, `groups`, `lineage`, `related`, `url`; `deployment inbox` → `section`, `tasks`; `deployment show` → `deployment`, `inbox`, `inboxTasks`, `shipsHere`, `startedHere`; `backlog show` → `section` and `tasks` (before the revamp: `folders[].tasks`); `comment list` → `items` (with `hasMore`); `notify list` and `activity list` → `page` (with `isDone`, `continueCursor`); `history` and `plan history` → `undo` and `redo`; `ops ops` → `ops`; `notepad show` → `{notepad, blocks, tasks, markdown}`; `day show` → `items` (with `date`, `doneCount`); `day week` → `days[]` (each with `date`, `tasks`, `counts`), `late`, `counts`; `task do` → `doDate`, `changed`, `tasks[]`.
 - A write gives the new id and its `address`; a create of a task also gives `place` (`kind`, `id`, `title`, `path`, `address`) and `sectionId`; a create with `--route` also gives `routed` (`model`, `score`, `reason`, `candidates`); a move gives `to`, `moved[]`, and `movedIds` (the tasks and their subtrees). When the read of an address after a write fails, the result keeps the new id with `address: null` (exit 0), and stderr names the read to run again: do not run the write again.
 - Text output is short and stable, and always shows IDs and addresses. A list prints one line per record (`<kind> <id>  <title>  ...  <address>`; a task line starts with its checkbox), or one line `no <things>` when it is empty. A write prints `<past verb> <kind> <id>  <title>`, then its address and its place.
 - Errors go to stderr as `error <code>: <message>`, then indented candidates and hints. A hint names the next step. The exit code is not zero.
@@ -265,7 +265,12 @@ Gateway codes pass through: `unauthenticated`, `org_unauthorized`,
 revamp from the service: `task_has_subtasks` (a delete needs
 `--with-subtasks`), `subtask_too_deep` (one level: a subtask has no
 subtasks), `subtask_cycle`, `section_named_locked` (the named section of a
-project, a deliverable, or a deployment).
+project, a deliverable, or a deployment). Codes of the do dates and the done
+date: `do_date_invalid` (not a real `YYYY-MM-DD`), `do_date_range_invalid`
+(from after to, or more than 62 days), `do_date_too_many` (more than 100
+tasks), `done_date_invalid` (a done date in the future or before the
+creation), `task_not_done` (`tasks.setCompletedAt` on a task that is not
+done).
 
 An op that a deployment of Ops does not have yet fails with
 `agent_unknown_operation` and names the deploy. The CLI needs a deployment
@@ -375,13 +380,15 @@ A section has no priority (Task 413): `ops section priority` is gone.
 | `ops task list [--project \| --deliverable \| --section \| --deployment \| --master \| --mine [--all-orgs]] [--backlog] [--status open\|todo\|doing\|done\|all] [--priority <p\|none>] [--owner <me\|member\|none>] [--limit n]` — root tasks, each with its place and address; `--section` keeps the order of the section and gives the subtask counts (`sections.tasks`); `--deployment` lists the inbox (`deployments.inbox`); default `--status open`; more than one scope flag is a usage error | `ops task list --section "Alpha › v1 › Backend" --status all` |
 | `ops task list --all [--status …] [--limit n]` — every task of the org, placed and unplaced, newest first, as task summaries (address, home label); `--limit` is the total (default 200) | `ops task list --all --status done --json` |
 | `ops task list --unplaced [--status …] [--limit n]` — the tasks with no home; when the tasks need more bytes than one read (`task_read_too_large`), the CLI reads the pages of `tasks.listAllPage`; a page that is not the last and does not move the cursor stops the list (`pagination_stalled`, exit 1, no rows) | `ops task list --unplaced` |
+| `ops task list --do <late\|none\|day\|day..day> [--mine [--all-orgs]] [--status …] [--priority …] [--owner …] [--limit n]` — by do date: `late` (open, with a do date before today), `none` (open, no do date: `doDates.unplanned`), one day, or a range of at most 62 days (`doDates.agenda`); the scope is the active org, or with `--mine --all-orgs` your own tasks of every org; no other scope goes with `--do` | `ops task list --do late --mine --all-orgs` |
 | `ops task show <task>` — also the address, the parent, the people looped in (a `looped in` line with each name and users ID; `--json`: `loopedIn: [{userId, name}]`, `name` is `null` for a person who is not a member; an empty list when no person is looped in), the subtasks (the tree with the done count; `--json`: `subtasks`), the lineage, the task groups, the related links, and the attachments; when the incoming lineage stops at its byte budget, `--json` has `linksCut: true` and the text says so; a task with a Flint task note gives the lines `note` (the label, else the address) and `note link` (the open link), and `--json` has `note`, `noteLabel`, and `noteUrl` at the top (each `null` when the task has no note); the open review requests (the reviewer, the requester, the age, and the note; `--json`: `reviews: {open, closed}`, from `reviews.forTask`; a deployment without the op gives no `reviews`) | `ops task show @v1/test/task/<id>#ops` |
 | `ops task context <task> [--comments <n>]` — the full context of a task for an agent: the description, the place, the people, and the comments (no change events); `--comments` keeps the newest n (1 to 500, default 200). Read it before you work on a task | `ops task context <taskId> --comments 20 --json` |
 | `ops task search <query> [--limit 1-100]` | `ops task search docs --limit 5` |
-| `ops task create <title> [--section <s> \| --project <p> \| --deliverable <d> \| --deployment <d> \| --parent <task> \| --route [text] \| --master \| --unplaced] [--tag feedback\|hotfix\|ongoing\|recurring] [--every day\|week\|month] [--repo <name>] [--note <address> [--note-label <text>]] [--body <md\|-> \| --body-file <path>] [--priority low\|medium\|high\|urgent] [--assign <me\|member>] [--top]` — default: the master backlog, at the end; `--project` is its backlog section, `--deliverable` its main section (the named section of the deliverable; the service makes it when there is none), `--deployment` its inbox, `--parent` a subtask; `--route` asks `route.suggest` with the text (default: the title) and prints the place, the score, and the reason; `--repo` adds a `repo` related link (`taskRelations.add`); the output gives the stored title (a trailing digit of the title is the rarity: "Fix login 1" is stored as "Fix login"), the address, and the section | `ops task create "Login fails on Safari" --deployment Production --tag hotfix` |
-| `ops task update <task> [--title] [--body <md\|-> \| --body-file <path>] [--priority <p\|none>] [--assign <member\|none>] [--rarity <1-7\|none>] [--tag <tag\|none>] [--every day\|week\|month\|none]` — `--tag` and `--every` need `tasks.update` with `tag` and `recurrence` (MODEL; a deployment without them refuses with `agent_invalid_input`) | `ops task update "Write docs" --body-file notes.md` |
+| `ops task create <title> [--section <s> \| --project <p> \| --deliverable <d> \| --deployment <d> \| --parent <task> \| --route [text] \| --master \| --unplaced] [--tag feedback\|hotfix\|ongoing\|recurring] [--every day\|week\|month] [--repo <name>] [--note <address> [--note-label <text>]] [--body <md\|-> \| --body-file <path>] [--priority low\|medium\|high\|urgent] [--assign <me\|member>] [--top] [--do <day>]` — default: the master backlog, at the end; `--project` is its backlog section, `--deliverable` its main section (the named section of the deliverable; the service makes it when there is none), `--deployment` its inbox, `--parent` a subtask; `--route` asks `route.suggest` with the text (default: the title) and prints the place, the score, and the reason; `--repo` adds a `repo` related link (`taskRelations.add`); the output gives the stored title (a trailing digit of the title is the rarity: "Fix login 1" is stored as "Fix login"), the address, and the section; `--do` sets the do date | `ops task create "Login fails on Safari" --deployment Production --tag hotfix` |
+| `ops task update <task> [--title] [--body <md\|-> \| --body-file <path>] [--priority <p\|none>] [--assign <member\|none>] [--rarity <1-7\|none>] [--tag <tag\|none>] [--every day\|week\|month\|none] [--do <day\|none>]` — `--tag` and `--every` need `tasks.update` with `tag` and `recurrence` (MODEL; a deployment without them refuses with `agent_invalid_input`); `--do` sets or clears the do date | `ops task update "Write docs" --body-file notes.md` |
 | `ops task start <task>` — doing | `ops task start "Write docs"` |
-| `ops task done <task>` — the same as `close` with no result | `ops task done "Write docs"` |
+| `ops task done <task> [--on <when>]` — the same as `close` with no result; `--on` gives the done date: `today`, `yesterday`, `-2d`, a past `YYYY-MM-DD` (12:00 local; a task created after 12:00 of that day: its creation + 1 minute), or `YYYY-MM-DD HH:mm`; on a done task `--on` changes the done date (`tasks.setCompletedAt`), else `tasks.close` takes `completedAt`; `--json`: `{id, checkbox: "done", completedAt?, redated?}` | `ops task done "Write docs" --on yesterday` |
+| `ops task do <tasks...> --on <day\|none>` — set or clear the do date: the day on which the work is planned; one task: `tasks.setDoDate`; more (at most 100): `tasks.setDoDates`; `--json`: `{doDate, changed, tasks[]}` | `ops task do <a> <b> --on fri` |
 | `ops task reopen <task>` — doing | `ops task reopen "Write docs"` |
 | `ops task move <tasks...> --to <place> [--priority <p\|none>]` — one task: `tasks.move`; more tasks: `tasks.moveMany`; each takes its subtree; the places are in [Places](#places---to-of-task-move); the former `--subsection`, `--backlog`, and `--folder` still work, hidden | `ops task move <a> <b> --to section:"Alpha › v1 › Backend"` |
 | `ops task reorder <task> (--before <t>\|--after <t>\|--top\|--bottom)` | `ops task reorder "Write docs" --after "Draft outline"` |
@@ -430,7 +437,7 @@ has 0 or 1 home and 0 or more related links. A task with no home is
 
 | Command | Example |
 |---|---|
-| `ops task close <task> [--result <md\|->]` — `tasks.close`: the status `done`, with an optional result; `--json`: `{id, checkbox: "done", result?}` | `ops task close <task> --result "The pin works on dev."` |
+| `ops task close <task> [--result <md\|->] [--on <when>]` — `tasks.close`: the status `done`, with an optional result; `--on` as in `task done`; `--json`: `{id, checkbox: "done", result?, completedAt?, redated?}` | `ops task close <task> --result "The pin works on dev." --on "2026-11-16 17:30"` |
 | `ops task result <task> <md\|->` — `""` clears it | `ops task result <task> "The pin works on dev."` |
 | `ops task note <task> <address> [--label <text>]` / `ops task note <task> --clear` — `tasks.setNote` ((Task) 1291): the Flint task note holds the content, and Ops keeps its address, `@v1/<org>/task/<note id>#flint/<flint>` (`flint resolve @v1//task/<n> --json` gives it); a new address with no `--label` clears the label; `--json` gives `{taskId, address, note, noteLabel, noteUrl}`; `noteUrl` is `obsidian://nuu-flint?address=` and the encoded note address, and the NUU Flint plugin opens it; a wrong address refuses with `task_note_invalid` | `ops task note <task> @v1/nuucognition/task/<uuid>#flint/nuu-flint --label "Task 1291 · NUU Flint"` |
 | `ops task home <task> (--section <s> \| --backlog [--project <p>] [--folder <f>] \| --none)` — `tasks.home`; `--project` and `--folder` imply `--backlog`; `--backlog` alone is the master backlog; `--none` unplaces the task; for a deliverable, a deployment, or a parent, use `ops task move --to` | `ops task home <task> --backlog --project Alpha` |
@@ -899,9 +906,15 @@ Traps:
 ### day
 
 The day plan is your own ordered list of tasks for one date. It can hold
-tasks of any of your orgs, and at most 100 tasks. A date takes
-`YYYY-MM-DD`, `today`, `tomorrow`, `yesterday`, or an offset such as `+1d`
-or `-1w`; the default is today on this machine.
+tasks of any of your orgs, and at most 100 tasks. The do date of a task
+says when; the plan orders the tasks of one day. A task that you do (a task
+of your personal workspace, or a task that you own) shows in the plan of its
+do date. `day add` sets the do date of each task to the date, and `day
+remove` clears a do date that is the date. A date takes `YYYY-MM-DD`,
+`today`, `tomorrow`, `yesterday`, a weekday name (`fri` or `friday`: the
+next one after today, so `fri` on a Friday is next Friday), `next-week` (its
+Monday), or an offset such as `+1d` or `-1w`; the default is today on this
+machine.
 
 | Command | Example |
 |---|---|
@@ -909,7 +922,8 @@ or `-1w`; the default is today on this machine.
 | `ops day add <task...> [--date <date>] [--top] [--source-org <org>]` — at the end (`--top`: at the start); a title is searched in your personal workspace, or in the org of `--source-org` | `ops day add "Write the spec" --source-org nuucognition --date tomorrow` |
 | `ops day remove <task...> [--date <date>]` — the tasks stay as they are | `ops day remove <taskId>` |
 | `ops day reorder <task> (--before <t> \| --after <t> \| --top \| --bottom) [--date <date>]` | `ops day reorder <taskId> --top` |
-| `ops day carry [--date <date>]` — add the unfinished tasks of the 7 days before the date to the end of its plan | `ops day carry` |
+| `ops day carry [--date <date>]` — move the unfinished tasks of the 7 days before the date to its plan: the tasks of those plans and your open tasks with a do date in those days; each gets the date as its do date | `ops day carry` |
+| `ops day week [--from <day>] [--days n] [--done]` — your do dates of 7 days (1 to 62): the late tasks (open, with a do date before today, with no limit of days), then each day with its counts and its tasks (`doDates.agenda`, `mine: true`); a team `--org` is a filter, as in `show`; `--json`: `{from, to, today, days[{date, tasks, counts}], late, counts, truncated}` | `ops day week --from mon --done` |
 
 Traps:
 
@@ -920,6 +934,13 @@ Traps:
   ID, or a title). `add` finds the task in an org.
 - To check a task off, use `ops task done <task>`. The day plan has no
   done mark of its own.
+- Set a do date with `ops task do <task> --on <day>`; `--on none` clears it.
+  A done task keeps its do date.
+- "Today" is the date of this computer: the CLI sends it as `today`, so a
+  late task is late on the date of the person.
+- A done date is never in the future, and never before the creation of the
+  task (`done_date_invalid`). A weekday name is the next such day: give a
+  past date for a done date.
 
 ### share
 

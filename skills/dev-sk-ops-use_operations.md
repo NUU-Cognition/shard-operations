@@ -54,7 +54,8 @@ The model:
 | **Comment** | A post on the Updates timeline of a task. Only a task carries comments. | `ops comment …` |
 | **Agent session** | An Orbh session at an Ops object (a task, a section, a deliverable, or a project): it keeps the object as an item (`flint orbh objects add <address> --subscribe`). Its current object is its newest Ops item. It works for the person who attached it. A person speaks to it with a comment on a task (a message to the session: it answers with a comment, never in the chat), or in the chat of the session (Orbh Chat). | `ops agents` |
 | **Agent defaults** | The Flint, the computer, the site, the profile (`runtime/profile`), and the mode of a new agent session. A project and a deliverable hold them. Each value comes from the nearest level: the Flint task note of a task, then the deliverable, then the project. | `ops agents defaults <ref>`, `ops agents defaults set <project or deliverable>` |
-| **Day plan** | Your own ordered list of tasks for one date. Personal only. | `ops day …` |
+| **Day plan** | Your own ordered list of tasks for one date. Personal only. A task that you do shows in the plan of its do date. | `ops day …` |
+| **Do date** | The day on which the work of a task is planned. An open task with a do date before today is late. | `ops task do`, `ops day week`, `ops task list --do` |
 | **Calendar and event** | A calendar is a named, coloured set of events; one is your default. An event is timed, all-day, or a **period** (an all-day event of more than one day). It can repeat, and it can attach to a task or a deadline. | `ops calendar …`, `ops event …` |
 | **Share** | Access to one record (a task, a project, a deliverable) for another org or one person, as `reader` or `editor`. | `ops share …` |
 | **Address** | The stable name of a record: `@v1/<org>/<kind>/<key>#ops` (for example `@v1/acme/task/<id>#ops`). A project, a deliverable, a task, a task group, and a notepad have an address row (an alias, else the id form). A section and a deployment have the id form only (`@v1/<org>/section/<id>#ops`). A plan, a step, a deadline, and a blocker have no address: use the ID. | `ops address <record>`, any record argument |
@@ -137,7 +138,7 @@ Use the first command that fits. `ops <noun> <verb> --help` gives the flags and 
 | **Change a step** (plan or stream) | `ops step split <step> [--before]`, `ops step split-beside <step>`, `ops step state <planned\|active\|done> <steps...>`, `ops step done-next <step>`, `ops step move-links --link <from>:<to> --end from\|to --target <step>`, `ops step remove-links <from>:<to>`, `ops step place <step> --x --y`; a stream step title needs `--stream <stream>` |
 | **Share** a record | `ops share list\|access <record>`, `ops share add <record> --to org:<slug>\|person:<user ID> [--permission reader\|editor]`, `ops share permission <shareId> <reader\|editor>`, `ops share remove <shareId>`, `ops share with` |
 | **Calendar** and events | `ops calendar list\|show\|create\|update\|delete\|default`, `ops event list [--from <day>] [--days <n>]`, `ops event create <title> (--start <YYYY-MM-DDTHH:mm> (--end <dt> \| --duration 1h) \| --date <day> [--until <day>]) [--repeat … --weekdays …] [--attach task:<ref>]`, `ops event update\|delete <event> [--occurrence <day>] [--scope this\|following\|all]`, `ops event attach\|detach\|for` |
-| **Schedule** | `ops deadline create\|shift\|links\|requires\|assign`, `ops day candidates --date today` (open tasks of every org, the planned ones marked; personal: no team `--org`), then `ops day add <taskId>...`, `ops day show\|reorder\|carry`, `ops event create <label> --date <day> [--until <day>]` (a label on a range of days; `ops day-label` is gone), `ops deployment schedule` |
+| **Schedule** | `ops deadline create\|shift\|links\|requires\|assign`, `ops task do <task...> --on <day>`, `ops day week`, `ops day candidates --date today` (open tasks of every org, the planned ones marked; personal: no team `--org`), then `ops day add <taskId>...`, `ops day show\|reorder\|carry`, `ops event create <label> --date <day> [--until <day>]` (a label on a range of days; `ops day-label` is gone), `ops deployment schedule` |
 | **Block** and unblock | `ops blocker create <title> --check <date> --on <record>`, `ops blocker list --due`, `ops blocker delay <blocker> <date>` (the date is an argument, not `--to`), `ops blocker resolve\|drop\|reopen` |
 | **Comment** | `ops comment list\|add\|edit\|react <task> …`, `ops comment count <tasks...>`, `ops comment people` (who you can mention) |
 | **Show images and videos** in an Update | `ops media attach <task> <path...> [--body <text>\|-] [--body-file <path>] [--no-comment] [--no-ffmpeg]` (one Update with an embed `![[ops-media:<fileId>]]` on each line), `ops media list <task>`, `ops media get <task> <fileId> [-o <path>]`, `ops media url <task> <fileId...>` (signed URLs: never post them), `ops media detach <fileId>` ([[dev-knw-ops-cli]] § media) |
@@ -220,11 +221,14 @@ Each recipe uses `--org <org>` when the org is not the active one. Use `--json` 
    ops task move <task> --to section:"Alpha › v1 › Backend"
    ```
    The full procedure: [[dev-sk-ops-triage_inbox]].
-8. **Plan your day.**
+8. **Plan your day and your week.**
    ```bash
+   ops day week                     # the late tasks, then 7 days with their tasks
+   ops task do <task> <task> --on fri   # a do date; --on none clears it
    ops day show today
-   ops day add <task> <task>        # at the end; --top for the start
-   ops day carry                    # the unfinished tasks of the last 7 days
+   ops day add <task> <task>        # at the end; --top for the start; sets the do date
+   ops day carry                    # the unfinished tasks of the last 7 days, to today
+   ops task done <task> --on yesterday  # a task that was done yesterday
    ```
 9. **Answer a question that no command answers.**
    ```bash
@@ -346,6 +350,8 @@ Each recipe uses `--org <org>` when the org is not the active one. Use `--json` 
 | `unknown option '--outcome'` | A task has no outcome (removed 2026-11-04). Run `ops task close <task> [--result <text>]` or `ops task done <task>`. |
 | `loop_full` | A task loops in at most 50 people. Take a person out first: `ops task loop remove <task> <person>`. |
 | `day_plan_personal_only` | `ops day` and `ops day candidates` are personal. Drop `--org`, or pass `--org me`. |
+| `done_date_invalid` | A done date is today or a day before it, and not before the creation of the task. Give a past date: `--on yesterday`. |
+| `do_date_too_many` | Give at most 100 tasks to `ops task do`. |
 | `note: the ops-dev bundle … is older than its source` | A note only: the dev launcher runs the source. |
 | A command group with no verb fails | `ops task` alone is a usage error that lists the verbs. Run `ops task --help`. |
 
