@@ -19,13 +19,13 @@ The source moved from the NUU Operations Flint to the NUU Flint on 2026-10-21 (o
 
 Version 0.3.0 (ops-cli-publish-1023) adds the main skill `sk-ops-use_operations`: an agent with no other context can do Operations work with it.
 
-Version 0.8.0 (storage-1112) merges the Tasks shard into Operations: the task workflows (create task, scope task, do task, create and do task, review task, do task group), the task skills, the task knowledge, and the task scripts `task-new`, `task-link`, and `task-sync`. Each task that the shard makes has a task note and an Ops task, linked both ways. The shard depends on the Projects shard (the type `Task` and the template `tmp-proj-task-v0.2`). It adds a setup (`setup: flint`) and the script `projects-note`, which writes the Mesh note `Mesh/(System) Ops Projects.md`: the projects of the Ops org that matter to the Flint. The Tasks shard is deprecated: it stays published, and the setup uninstalls it from the Flint. Since 0.8.2 the shard has no migration files: the setup does the one-time work in each Flint.
+Version 0.8.0 (storage-1112) merges the Tasks shard into Operations: the task workflows (create task, scope task, do task, create and do task, review task, do task group), the task skills, the task knowledge, and the task scripts `task-new`, `task-link`, and `task-sync`. Each task that the shard makes has a task note and an Ops task, linked both ways. The shard depends on the Projects shard (the type `Task` and the template `tmp-proj-task-v0.2`). It adds a setup (`setup: flint`) and the script `projects-note`, which writes the Mesh note `Mesh/(System) Ops Projects.md`: the projects of the Ops org that matter to the Flint. The Tasks shard is deprecated: it stays published, and the setup uninstalls it from the Flint. Since 0.8.2 the shard has no migration files: the setup does the one-time work in each Flint. Version 0.8.3 adds the task workflow scope and do task (`scope_and_do_task`): the scope and the work of a task that exists, in one run.
 
 Version 0.7.0 (total-orchestration-1111) adds agent sessions at Ops objects: the duty of an agent session at a task, a section, a deliverable, or a project, the two ways to speak to it (a comment on a task, or the chat), `ops agents`, and the agent defaults (`ops agents defaults` and `ops agents defaults set`).
 
 Version 0.6.0 (ops-overnight-1109) adds Trident (streams, stream steps, substreams, drawings, and workspaces), shares, holds, calendars and events, the deliverable move, the locked section with the name of its home, and subtasks of one level. It removes `ops section priority` and `ops task subtask indent`, and it gives the data mode of Task 415 (a dev build uses PROD data by default).
 
-The shard teaches an agent the Operations data model, the plan canvas rules, the `ops` CLI, the task model, ten workflows, and fifteen skills. It owns no Mesh type. It writes the task notes (with the scripts) and the projects note (with the setup). It comes from (Task) 297. (Task) 309 added `ops task context`. (Task) 320 made the CLI help, output, errors, and flags consistent and added `ops history`, `ops undo`, and `ops redo`; (Task) 327 brought this shard up to date with it, and with the review fixes and the `ops favourite` commands of (Task) 320.
+The shard teaches an agent the Operations data model, the plan canvas rules, the `ops` CLI, the task model, eleven workflows, and fifteen skills. It owns no Mesh type. It writes the task notes (with the scripts) and the projects note (with the setup). It comes from (Task) 297. (Task) 309 added `ops task context`. (Task) 320 made the CLI help, output, errors, and flags consistent and added `ops history`, `ops undo`, and `ops redo`; (Task) 327 brought this shard up to date with it, and with the review fixes and the `ops favourite` commands of (Task) 320.
 
 ## Prerequisite
 
@@ -61,7 +61,7 @@ Shards/(Source Remote) Operations/
     dev-wkfl-ops-plan_layout.md          # both modes: > [!headless] callouts
     dev-wkfl-ops-backlog_triage.md       # both modes: > [!headless] callouts
     dev-wkfl-ops-deliverable_setup.md    # both modes: > [!headless] callouts
-    dev-wkfl-ops-{create_task,scope_task,do_task,create_and_do_task,review_task,do_task_group}.md   # each with an invocation file
+    dev-wkfl-ops-{create_task,scope_task,do_task,scope_and_do_task,create_and_do_task,review_task,do_task_group}.md   # each with an invocation file
   scripts/
     dev-task-new.js, dev-task-link.js, dev-task-sync.js   # the task notes
     dev-note-lib.js, dev-task-lib.js                      # their shared code

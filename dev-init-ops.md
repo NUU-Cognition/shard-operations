@@ -85,7 +85,7 @@ The service derives some states. A section is done when all its root tasks are d
 | Read a task before you work on it | `ops task context <task>` |
 | See where a new task belongs | `ops route "<text>"` |
 | Create a task in the right place (a task note and an Ops task) | `flint shard ops task-new "<title>" --section|--project|--deliverable|--deployment|--parent <ref>` ([[dev-sk-ops-create_task]]) |
-| Plan a task, do a task, or create and do it | [[dev-wkfl-ops-create_task]], [[dev-wkfl-ops-do_task]], [[dev-wkfl-ops-create_and_do_task]] (§ Tasks: the Task Note and the Ops Task) |
+| Plan a task, do a task, scope and do it, or create and do it | [[dev-wkfl-ops-create_task]], [[dev-wkfl-ops-do_task]], [[dev-wkfl-ops-scope_and_do_task]], [[dev-wkfl-ops-create_and_do_task]] (§ Tasks: the Task Note and the Ops Task) |
 | Close a task with its result | `ops task result <task> "<text>"`, `ops task close <task>`, then `flint shard ops task-sync <task>` ([[dev-sk-ops-close_task]]) |
 | Move tasks (with their subtasks) | `ops task move <tasks...> --to <place>` |
 | Move a deliverable to another project | `ops deliverable move <deliverable> --to <project>` |
@@ -220,7 +220,7 @@ todo → doing → done
 ```
 
 - A task has no type, no stage, and no outcome. Its state is its status and its result. Progress goes into the result: `ops task result <ref> "<text>"` (what the work gave, the commits, the session).
-- **Each finished task gets exactly one review request in Ops**, after its result and before any close, in each work workflow (`do_task`, `create_and_do_task`, `do_task_group`): `ops task review request <ref> --note "<the summary, the commits, and what to check>" --json`. Record its `itemId`. A task of a team with no owner refuses with `review_no_reviewer`: then give `--to me`. A blocked or unfinished task gets no request.
+- **Each finished task gets exactly one review request in Ops**, after its result and before any close, in each work workflow (`do_task`, `scope_and_do_task`, `create_and_do_task`, `do_task_group`): `ops task review request <ref> --note "<the summary, the commits, and what to check>" --json`. Record its `itemId`. A task of a team with no owner refuses with `review_no_reviewer`: then give `--to me`. A blocked or unfinished task gets no request.
 - After each change of the Ops state (a start, a close, a reopen), run `flint shard ops task-sync <ref>`.
 - [[dev-sk-ops-close_task]] gives the close.
 
@@ -249,6 +249,7 @@ Each task workflow has an invocation file (`wkfl-ops-<name>.invocation.json`, fo
 | Create Task | `flint shard invoke ops create_task` | `ops do_task` |
 | Scope Task | `flint shard invoke ops scope_task [--input task=<address>]` | `ops do_task` |
 | Do Task | `flint shard invoke ops do_task --input task=<address>` | `ops review_task`, in a headless session only |
+| Scope and Do Task | `flint shard invoke ops scope_and_do_task --input task=<address>` | `ops review_task`, in a headless session only |
 | Create and Do Task | `flint shard invoke ops create_and_do_task` | `ops review_task`, in a headless session only |
 | Review Task | `flint shard invoke ops review_task --input task=<address>` | — |
 | Do Task Group | `flint shard invoke ops do_task_group [--input task=<task group address>]` | — |
@@ -307,6 +308,7 @@ The task workflows (a task note and an Ops task for each task):
 - [[dev-wkfl-ops-create_task]] — make a `todo` task for later work, place it with the hint rule, and scope it.
 - [[dev-wkfl-ops-scope_task]] — research first, then write the scope and the definition of done into the task note.
 - [[dev-wkfl-ops-do_task]] — add the task as an object, work, make the WIP commits, write the result with the commits, ask for the review in Ops, and give a summary.
+- [[dev-wkfl-ops-scope_and_do_task]] — scope a task that exists and do it in one run: add it as an object, research, write the scope into the task note, post one comment with the scope summary, then work, with the review request after the result.
 - [[dev-wkfl-ops-create_and_do_task]] — create a task, add it as an object, and do it in one run, with the review request after the result.
 - [[dev-wkfl-ops-review_task]] — a second session checks the work against the task note, and writes a pass into the result or the findings into the note.
 - [[dev-wkfl-ops-do_task_group]] — make or take a task group, add each of its tasks as an object, do each task, and ask for the review of each finished task.
@@ -330,6 +332,8 @@ The workflow lives in the Strike shard because the Strike bind installs that sha
 A person can start an agent session in a Flint of a computer from a task in the web app: the page Computers, or "Start session" in the task dialog (Task 1157 of the NUU Flint, on dev data first). The web app sends the action `session.start` through NUU Network to that computer and Flint, with the profile and the account that the person picked. The session runs headless in that Flint, with the title `Ops: <task title>`.
 
 The session gets the task context in its prompt: the task title, the link of the task, the task id with its org and data mode, the command `ops task context <task> --org <org>`, the command `ops comment add <task> "<update>" --org <org>`, and the description of the task. So the work of that session belongs to that task: follow "Work Tied To An Operations Task", and read `ops task context` first. The web app records the launch on the task (the computer, the Flint, the target, the account, the request id, the session id) with a hash of the prompt, not the prompt text. The shard Network Access (`nax`, in the NUU Flint) teaches how an app does this.
+
+**A start can name a workflow** (Operations 0.8.3). In the launcher of a task, the person selects Scope, Do, or Scope and do, or no workflow. The prompt then has a part that starts with `Workflow of this start: <name>.` and gives the invoke command with the address of the task: `flint shard invoke ops scope_task --input task=<address>`, `flint shard invoke ops do_task --input task=<address>`, or `flint shard invoke ops scope_and_do_task --input task=<address>`. Run that command and follow the workflow to its end: [[dev-wkfl-ops-scope_task]], [[dev-wkfl-ops-do_task]], or [[dev-wkfl-ops-scope_and_do_task]]. The instruction of the person, when the prompt has one, adds to the workflow. A prompt with no such part is a start with no workflow: follow "Work Tied To An Operations Task".
 
 ## Agent Sessions at Ops Objects
 
@@ -396,7 +400,7 @@ Use the workflows and the skills of this init, and follow the `> [!headless]` ca
 - [[dev-wkfl-ops-backlog_triage]] — review and triage a backlog.
 - [[dev-wkfl-ops-deliverable_setup]] — a deliverable from a scope description.
 - The skills: [[dev-sk-ops-create_task]], [[dev-sk-ops-move_tasks]], [[dev-sk-ops-triage_inbox]], [[dev-sk-ops-plan_deliverable]], [[dev-sk-ops-read_task_map]].
-- The task workflows: [[dev-wkfl-ops-create_task]], [[dev-wkfl-ops-scope_task]], [[dev-wkfl-ops-do_task]], [[dev-wkfl-ops-create_and_do_task]], [[dev-wkfl-ops-review_task]], [[dev-wkfl-ops-do_task_group]], and the task skills of § Workflows and Skills.
+- The task workflows: [[dev-wkfl-ops-create_task]], [[dev-wkfl-ops-scope_task]], [[dev-wkfl-ops-do_task]], [[dev-wkfl-ops-scope_and_do_task]], [[dev-wkfl-ops-create_and_do_task]], [[dev-wkfl-ops-review_task]], [[dev-wkfl-ops-do_task_group]], and the task skills of § Workflows and Skills.
 
 The task workflows replace each person gate as this table says:
 
@@ -433,7 +437,7 @@ The callouts of the workflows set these phases:
 | [[dev-wkfl-ops-plan_layout]] | `reading-plan`, `placing-steps` |
 | [[dev-wkfl-ops-backlog_triage]] | `reading-backlog`, `applying` (Apply mode only) |
 | [[dev-wkfl-ops-deliverable_setup]] | `reading-scope`, `creating` |
-| The task workflows ([[dev-wkfl-ops-create_task]], [[dev-wkfl-ops-scope_task]], [[dev-wkfl-ops-do_task]], [[dev-wkfl-ops-create_and_do_task]], [[dev-wkfl-ops-review_task]], [[dev-wkfl-ops-do_task_group]]) | `reading-task`, `creating-task`, `implementing`, `reviewing`, `resolving`, `blocked`, `complete` |
+| The task workflows ([[dev-wkfl-ops-create_task]], [[dev-wkfl-ops-scope_task]], [[dev-wkfl-ops-do_task]], [[dev-wkfl-ops-scope_and_do_task]], [[dev-wkfl-ops-create_and_do_task]], [[dev-wkfl-ops-review_task]], [[dev-wkfl-ops-do_task_group]]) | `reading-task`, `creating-task`, `implementing`, `reviewing`, `resolving`, `blocked`, `complete` |
 
 For the task workflows, also set `flint orbh session set progress "<done>/<total> checks"`.
 

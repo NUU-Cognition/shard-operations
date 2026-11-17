@@ -1,3 +1,14 @@
+# 0.8.3
+
+The workflow Scope and Do Task, for the workflow launcher of the Ops web app. In the launcher, a person selects Scope (`scope_task`), Do (`do_task`), or Scope and do (`scope_and_do_task`) for a task. A new agent session then starts at the task with `flint shard invoke ops <workflow> --input task=<address>`.
+
+- **`scope_and_do_task`** (`wkfl-ops-scope_and_do_task`, with its invocation file): scope a task that exists and do it in one run, with no stop for a person between the two parts. Start: `flint shard invoke ops scope_and_do_task --input task=<address>`. The steps are `prepare`, `research`, `scope`, `work`, `result`, `review`, and `close`. In a headless session, the `done` close prints `ops review_task`, as for `do_task`.
+- **The stages point to the two workflows.** The scope part follows `scope_task`: the research, the proposal, the scope, and the definition of done in the task note. The work part follows `do_task` exactly: the work, the WIP commits, the result with the commits, the one review request in Ops, and the summary. The new file holds the rules of the joined run.
+- **The rules of the joined run.** Stage 1 adds the task as an object before the first change, gives a task with no note its note (`flint shard ops task-new --ops <address>`), sets the status `doing`, and runs `task-sync`. Stage 3 posts exactly one comment on the task with the scope summary (`ops comment add`), so that the person sees the scope in Ops before the work goes on. An interactive session gives the person the scope summary and continues unless the person stops it. A headless session continues at once.
+- **The stop rule.** When the scope finds that the work is not possible, is too large for one run, or needs a decision of a person, the run stops after the scope. The blocker goes under `# Notes` of the task note and into the one comment. The task gets no result and no review request, and the session reports. The invocation closes with `--outcome abandoned` and the blocker as the reason. The next command is `do_task`, after the decision.
+- **The init** names the workflow in the job table, in the rule of the review request, in the table Task Invocations, in the lists of the task workflows (also in `# Headless`), and in the phase table. The manifest and the README name it too.
+- No migration and no setup work. No other change: the other workflows, the skills, the knowledge, and the scripts are the same as in 0.8.2.
+
 # 0.8.2
 
 No migration files (the operator decision of 2026-11-16). The update from an older version fails no more, and it needs no migration step.

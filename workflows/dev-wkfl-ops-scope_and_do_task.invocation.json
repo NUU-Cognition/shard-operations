@@ -1,0 +1,110 @@
+{
+  "format": "shard-invocation/0.3",
+  "workflow": "wkfl-ops-scope_and_do_task",
+  "title": "Scope and Do Task",
+  "inputs": {
+    "task": {
+      "kind": "text",
+      "required": true,
+      "description": "The address of the task to scope and do, for example @v1/nuucognition/task/<id>#ops. The task exists in Ops. It can have no task note: Stage 1 gives it one."
+    }
+  },
+  "then": [
+    {
+      "shard": "ops",
+      "workflow": "review_task",
+      "inputs": { "task": "{{task}}" },
+      "when": { "session.mode": ["headless"] }
+    }
+  ],
+  "steps": [
+    {
+      "id": "prepare",
+      "title": "Task Preparation",
+      "by": "agent",
+      "evidence": "required",
+      "stage": "Stage 1: Task Preparation",
+      "next": {
+        "interactive": "Read the task with ops task show {{task}} --json. When it is done, stop, and report it. Add it as an object before the first change: flint orbh objects add {{task}} --subscribe. Read its task note (a task with no note gets one: flint shard ops task-new --ops {{task}}, with --body-file <file> for its body). Set doing when it is todo: ops task start {{task}}. Then run flint shard ops task-sync {{task}}.",
+        "headless": "Set the phase reading-task. Read the task with ops task show {{task}} --json. When it is done, stop, and report it. Add it as an object before the first change: flint orbh objects add {{task}} --subscribe. Read its task note (a task with no note gets one: flint shard ops task-new --ops {{task}}, with --body-file <file> for its body). Set doing when it is todo: ops task start {{task}}. Then run flint shard ops task-sync {{task}}."
+      }
+    },
+    {
+      "id": "research",
+      "title": "Research",
+      "by": "agent",
+      "evidence": "required",
+      "stage": "Stage 2: Research",
+      "next": {
+        "interactive": "Research before you write the scope of {{task}}: the task with its comments (ops task context {{task}} --json), its task note, the Mesh, the code, and the related Ops tasks. Write nothing yet. Ask the person only when the request can mean two very different things.",
+        "headless": "Keep the phase reading-task. Research before you write the scope of {{task}}: the task with its comments (ops task context {{task}} --json), its task note, the Mesh, the code, and the related Ops tasks. Write nothing yet. Do not ask a person: keep a blocking question for the stop rule of the step scope."
+      }
+    },
+    {
+      "id": "scope",
+      "title": "Scope",
+      "by": "agent",
+      "evidence": "required",
+      "stage": "Stage 3: Scope",
+      "next": {
+        "interactive": "Write the proposal under Notes and the scope with the definition of done into the task note of {{task}}. Add a Task Log line, and run flint shard ops task-sync {{task}}. Post exactly one comment with the scope summary: ops comment add {{task}} '<the scope summary>'. Give the person the scope summary, and go on to the work at once: do not wait for a confirm. The stop rule: when the work is not possible, is too large for one run, or needs a decision of a person, do no work. Write the blocker under Notes, put it in the one comment, ask for no review, and give the person the blocker and the do_task command. Then mark this step done with the blocker in the evidence, and close the invocation: flint shard invocations close {{invocation}} --outcome abandoned --reason '<the blocker>'.",
+        "headless": "Write the proposal under Notes and the scope with the definition of done into the task note of {{task}}. Check the scope yourself. Add a Task Log line, run flint shard ops task-sync {{task}}, and set the progress to 0 of the count of items of the definition of done. Post exactly one comment with the scope summary: ops comment add {{task}} '<the scope summary>'. Then go on to the work at once: do not wait for an answer. The stop rule: when the work is not possible, is too large for one run, or needs a decision of a person, do no work. Write the blocker under Notes, put it in the one comment, ask for no review, and set the phase blocked. Then mark this step done with the blocker in the evidence, and close the invocation: flint shard invocations close {{invocation}} --outcome abandoned --reason '<the blocker>'. Put the blocker and the do_task command in the result. When no parent frame is open, return with flint orbh session return --finish. When the close prints back in: (a parent frame is open), do not return: continue the parent frame."
+      }
+    },
+    {
+      "id": "work",
+      "title": "Task Work",
+      "by": "agent",
+      "evidence": "required",
+      "stage": "Stage 4: Task Work",
+      "next": {
+        "interactive": "Do the work of {{task}}: its task note holds the scope. Make each step that serves its intent a subtask in Strike. Follow the WIP commit rule of knw-ops-task_commits, and keep each commit as <sha> (<repo>) for the result.",
+        "headless": "Set the phase implementing. Do the work of {{task}}: its task note holds the scope. Keep the progress current. Follow the WIP commit rule of knw-ops-task_commits, and keep each commit as <sha> (<repo>) for the result. When blocked, use a deferred request."
+      }
+    },
+    {
+      "id": "result",
+      "title": "Result",
+      "by": "agent",
+      "evidence": "required",
+      "stage": "Stage 5: Result",
+      "next": "Write the result with ops task result {{task}} '<what the work gave>. Tests: <…>. Commits: <sha> (<repo>), …. Session: <ORBH_SESSION_ID>'. Then run flint shard ops task-sync {{task}}. When the work is finished, ask for the review in Ops now, with no wait for a person: ops task review request {{task}} --note '<the summary, the commits, and what to check>' --json. On review_no_reviewer (a task of a team with no owner), run it again with --to me (the operator). Put the itemId and the reviewer in the evidence of this step. A blocked or unfinished task gets no request: put the blocker in the evidence."
+    },
+    {
+      "id": "review",
+      "title": "Review Handoff",
+      "by": "agent",
+      "evidence": "required",
+      "stage": "Stage 6: Review Handoff",
+      "next": {
+        "interactive": "Give the person the summary of {{task}}, with the reviewer and the itemId of the review request of the step result (or the blocker). Do not ask for the review again. After a change of the result, run the same review request again (the same reviewer: again true, no second request). The review comes next in a second session: flint shard invoke ops review_task --input task={{task}}. Toward the review now: skip the step close, and close the invocation with --outcome done.",
+        "headless": "Do not ask for the review again: the step result recorded the request. Put the itemId and the reviewer in the result, or the error code and the review command, or the blocker. Set the phase complete. Mark this step done, and close the invocation: flint shard invocations close {{invocation}} --outcome done. Put the review_task command of the close in the result. When no parent frame is open, return with flint orbh session return --finish. When the close prints back in: (a parent frame is open), do not return: continue the parent frame."
+      }
+    },
+    {
+      "id": "close",
+      "title": "Close",
+      "by": "agent",
+      "evidence": "required",
+      "stage": "Stage 7: Close",
+      "modes": ["interactive"],
+      "next": "Close only a task whose review request is recorded (the step result). When the person confirms, close the task with sk-ops-close_task: ops task close {{task}}, then flint shard ops task-sync {{task}}. Keep the result: it names the commits. When the person wants the review first, skip this step with a reason, and close the invocation with --outcome done."
+    }
+  ],
+  "behaviours": [
+    {
+      "id": "object-hint",
+      "on": "invocation.open",
+      "when": { "task": "set" },
+      "say": "Add the task as an object before the first change: flint orbh objects add {{task}} --subscribe"
+    },
+    {
+      "id": "return-check",
+      "on": "session.return",
+      "phase": "before",
+      "disposition": ["finish"],
+      "when": { "task": "set" },
+      "say": "Before the return: write the result of {{task}}, with each commit as <sha> (<repo>) and the session. Then run flint shard ops task-sync {{task}}. A finished task has exactly one review request in Ops, after its result and before any close (ops task review request {{task}} --note '<…>' --json; on review_no_reviewer: --to me). Put its itemId and the review_task command in the result. A blocked or unfinished task has no request: put the blocker in the result. A run that stopped after the scope has no result and no request: put the blocker and the do_task command in the result."
+    }
+  ]
+}
