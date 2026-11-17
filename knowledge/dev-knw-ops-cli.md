@@ -937,7 +937,11 @@ Traps:
 - Set a do date with `ops task do <task> --on <day>`; `--on none` clears it.
   A done task keeps its do date.
 - "Today" is the date of this computer: the CLI sends it as `today`, so a
-  late task is late on the date of the person.
+  late task is late on the date of the person. `--tz <zone>` (an IANA name
+  such as `Australia/Melbourne`) gives another zone. A run through the NUU
+  MCP (a server in UTC) needs `tz` for today, tomorrow, a weekday, an
+  offset, a local time, and a command with no date: with no `tz`, it takes
+  only `YYYY-MM-DD`, and a done time with its zone.
 - A done date is never in the future, and never before the creation of the
   task (`done_date_invalid`). A weekday name is the next such day: give a
   past date for a done date.
