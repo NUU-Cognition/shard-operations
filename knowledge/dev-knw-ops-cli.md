@@ -1090,9 +1090,10 @@ The global options `--json` and `--org <org>` work on each verb.
 ### queue
 
 The queue (Task 496) is your own queue of agent orbs: the Cannon of the
-web app (`/<org>/cannon`) in the CLI. An orb is one live agent session at
-an Ops object, on a computer that you can run (`can: full`). A session on
-a computer that you can only see is not your orb. Each orb has one place:
+web app (`/<org>/cannon`) in the CLI. An orb is one live agent session, on
+a computer that you can run (`can: full`), with one or more Ops objects (a
+task, a project, a deliverable, a section). A session on a computer that
+you can only see is not your orb. Each orb has one place:
 
 - `queue`: the orb waits for you. Its session needs your input
   (`needs-input`), or it sleeps (`awaiting`) and a task of the session has
@@ -1102,30 +1103,31 @@ a computer that you can only see is not your orb. Each orb has one place:
 - `working`: the orb works (`working`). A mark does not change this place.
 
 A session that ended (`finished`, `abandoned`) is not in the queue. `ops
-queue` reads the sessions from NUU Network with no org (`live:objects`, as
-`ops agents` in the personal workspace), your marks (`cannon.marks`), and
-your open review requests (`reviews.mine`). The two gestures write a mark
-(`cannon.mark`): "Later" (the ring `parked`) and "Add to queue" (the ring
-`queue`). A mark holds `seen`, the `updatedAt` of the session in the feed
-at the time of the gesture. An `<orb>` is a session id, its first 8
-characters or more, or the address of the session (`ops queue` prints it).
+queue` reads the sessions from NUU Network with no org (`live:objects`),
+your marks (`cannon.marks`), and your open review requests
+(`reviews.mine`). An `<orb>` is a session id, its first 8 characters or
+more, or the address of the session (`ops queue` prints it).
 
-The queue is per person: it holds your orbs of each org. `--org <slug|name|me>`
-is a filter, as the org filter of the page: it keeps the orbs whose current
-object is in that org (the owner of the address of the current object, when
-it is one of your team orgs, else your personal workspace). With no `--org`,
-the queue shows each org. The stored default org does not apply. The filter
-changes no mark: the marks have no org.
+A queue belongs to an org, as a Cannon of the web: `ops queue` shows the
+orbs with an object in the active org (`--org <slug|name|me>`, else the
+stored default org, else your personal workspace), with their objects in
+that org. `--org all` gives each org. The org of an object is the owner of
+its address when it is one of your team orgs, else your personal
+workspace. An orb shows in each org where it has an object. A gesture on a
+named orb (`later`, `add`, `wake`, `close`) looks in each org, unless you
+give `--org`. The marks have no org.
 
 | Command | Example |
 |---|---|
-| `ops queue [list] [--org <org>]` — the verdict line (`9 in your queue, 6 parked, 3 working`), then the sections `Queue`, `Parked`, and `Working`, each with the oldest wait first; one line for each orb: the state word of its place (`Working` in flight; `Waits for you` in the queue; in the parked ring `Waits for you` when the session needs input, else `Waiting`), the time that it waits, the title of the session, the title of its current object, and the address of the session (with `later` or `added to queue` for a mark); a `next:` line names the head of the queue; a read that is cut adds a note line; `--json`: `{queue, parked, working, cut, reviewsTruncated}`, each orb `{sessionId, address, title, description?, workState, updatedAt, since, mark, current, taskIds, org, computer, flint}` (`org`: the org of the current object) | `ops queue --org nuucognition --json` |
-| `ops queue later <orb> [--org <org>]` — "Later": `cannon.mark` with the ring `parked`; it prints `parked orb <first 8 characters>` with the session, its current object, and its address; `--json`: `{marks}` | `ops queue later 3f2a9c1e` |
-| `ops queue add <orb or task> [--org <org>]` — "Add to queue": `cannon.mark` with the ring `queue`, for one orb, or for each live orb of a task (an ID, an address, or a web URL; a title is searched in the org of `--org`, else in your personal workspace); each orb goes to the tail of the queue; an orb of the task that works gets no mark, and a `skipped orb … it works now` line names it; `--json`: `{marks, skipped}` (`skipped`: `[{sessionId, reason: "working"}]`) | `ops queue add <taskId>` |
+| `ops queue [list] [--org <org or all>]` — the verdict line (`9 in your queue, 6 parked, 3 working`), then the sections `Queue`, `Parked`, and `Working`, each with the oldest wait first; one line for each orb: the state word of its place (`Working` in flight; `Waits for you` in the queue; in the parked ring `Waits for you` when the session needs input, else `Waiting`), the time that it waits, the title of the session, the title of its current object, and the address of the session (with `later` or `added to queue` for a mark); a `next:` line names the head of the queue; a read that is cut adds a note line; `--json`: `{queue, parked, working, cut, reviewsTruncated}`, each orb `{sessionId, address, title, description?, workState, updatedAt, stateAt?, since, mark, current, objects, taskIds, org, computer, flint}` (`objects`: its objects in the org of the view, the current one first; `org`: that org, or with `--org all` the org of the current object) | `ops queue --org nuucognition --json` |
+| `ops queue later <orb>` — "Later": the mark `cannon.mark` with the ring `parked`. For an orb that needs your input, of a `headless` or `subagent` session, on an online computer that parks (the capability `park`), it then also sends `session.park` through NUU Network: the session sleeps until a message wakes it. After the park, an open review request on its task gets one new `parked` mark, so the orb stays parked. A refused park keeps the mark (exit 0, a note line). It prints `parked orb <first 8 characters>` with the session, its current object, and its address; `--json`: `{marks, park}` (`park`: null, `{parked: true, requestId, held, pending?}`, or `{parked: false, code, reason}`) | `ops queue later 3f2a9c1e` |
+| `ops queue add <orb or task>` — "Add to queue": `cannon.mark` with the ring `queue`, for one orb, or for each live orb of a task (an ID, an address, or a web URL; a title is searched in the org of `--org`, else in your personal workspace); each orb goes to the tail of the queue; an orb of the task that works gets no mark, and a `skipped orb … it works now` line names it; `--json`: `{marks, skipped}` | `ops queue add <taskId>` |
+| `ops queue wake <orb> [text...]` — "Wake": `session.message` (default text `Wake`) through NUU Network (`commands:run`) to an orb that sleeps; it waits for the answer of the computer; `--json`: `{sessionId, requestId, state, reason?}` | `ops queue wake 3f2a9c1e` |
+| `ops queue close <orb>` — "Close": the current task of the orb gets the status done, then `session.close` ends the session; a computer with an older NUU client (no capability `close`) gets the detach: the session lets go of its Ops objects and still runs, and the output says so; `--json`: `{task, session, way}` (`way`: `close` or `detach`) | `ops queue close 3f2a9c1e` |
 
 The JSON fields of `ops queue`:
 
-- `queue`, `parked`, `working`: the orbs of each place, the oldest `since` first. `since` is the time of the valid mark that gives the place, else the `updatedAt` of the session. `mark` is that mark (`{sessionId, ring, seen, at}`), or null.
+- `queue`, `parked`, `working`: the orbs of each place, the oldest `since` first. `since` is the time of the valid mark that gives the place, else the time of the session (`stateAt`, the time of the last change of the work state, else `updatedAt`). `mark` is that mark (`{sessionId, ring, seen, at}`), or null.
 - `cut`: NUU Network gave its most objects (500), and more exist. An orb can be missing.
 - `reviewsTruncated`: you have more open review requests than `reviews.mine` gives (200). An orb at a later request can show as parked, not in the queue.
 
@@ -1133,27 +1135,29 @@ The error codes:
 
 - `orb_not_found` (exit 1): none of your live orbs (in the org of `--org`, when you give it) is that orb, or a task has no live orb of yours. With fewer than 8 characters, the error has exit 2.
 - `orb_ambiguous` (exit 2): the prefix names two or more of your orbs. The error lists them. Give more characters, the full session id, or the address.
-- `orb_working` (exit 2): the orb works now, so a mark has no effect on it. The CLI writes nothing. Give the mark again when the orb stops: it then lands in the queue. `add` of a task gives this error only when each orb of the task works.
+- `orb_working` (exit 2): the orb works now, so a mark (or Wake) has no effect on it. The CLI writes nothing. `add` of a task gives this error only when each orb of the task works.
+- `orb_waits_for_you` (exit 2): Wake of an orb that waits for your answer: answer it with `nuu message <session> "<text>"`.
+- `computer_offline` (exit 1): Wake or Close of an orb whose computer is offline. Nothing changed.
+- `no-capability` (exit 1): Close on a computer whose NUU client neither closes a session nor lets go of its objects. Nothing changed.
+- `command_refused`, `command_failed`, `command_expired`, `command_pending` (exit 1): the computer refused the command, it failed, it expired, or it did not answer in the wait of the CLI. A Close that fails after the task is done says so, and gives the command to try again.
 - `queue_list_cut` (exit 2): `add` of a task, when NUU Network gave a cut list of sessions. The CLI cannot find each orb of the task, so it writes nothing. Give each orb with `ops queue add <orb>`.
 - `network_sign_in` (exit 3): NUU Network does not accept the sign-in. A deployment with no Cannon ops gives `agent_unknown_operation`.
 
 Traps:
 
-- The queue is personal: the marks have no org, and each person sees only
-  their own marks. The page shows the orbs of each org at each route
-  (`/<org>/cannon` and `/me/cannon`), with the org filter of Your Day at the
-  top right corner; the filter stays in the browser. `ops queue` shows each
-  org, and `--org` is its filter.
+- The marks are personal: they have no org, and each person sees only their
+  own marks. The page `/<org>/cannon` shows the orbs with an object in that
+  org, and `/me/cannon` the orbs with an object in your personal workspace.
 - A mark holds until the session changes after it: it is valid while the
-  `updatedAt` of the session is at most `seen` plus 15 seconds. So a mark
-  ends when the orb works again, and the orb goes back to its default
-  place. A mark can also end with no work of the orb: the `updatedAt` of a
-  session also moves at other writes of its spool (for example a refresh of
-  one of its objects). The exact rule waits for a field of NUU Network: the
-  time of the last change of the work state.
+  time of the session is at most `seen` (with `stateAt`; plus 15 seconds
+  for a session of an older NUU client that gives only `updatedAt`). So a
+  mark ends when the orb works again, and the orb goes back to its default
+  place.
 - "Add to queue" puts the orb at the tail of the queue: the time of the
   mark is its `since`. A mark gives no review and no answer to the agent:
   to clear an orb, open its task or talk to it.
+- The connector refuses `ops queue wake` and `ops queue close`: they write
+  through NUU Network, which the read guard of the connector does not cover.
 
 ### calendar
 

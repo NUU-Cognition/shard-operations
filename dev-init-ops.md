@@ -106,7 +106,7 @@ The service derives some states. A section is done when all its root tasks are d
 | See who holds a task | `ops task holds <task>` |
 | Put a meeting, a day, or a period on a calendar | `ops calendar list|create|default`, `ops event create <title> (--start … --end … \| --date <day> [--until <day>])`, `ops event list --from today --days 7` |
 | See the agent sessions at Ops objects now | `ops agents [--computer <name>] [--all]` |
-| See your queue of agent orbs, park an orb, or add an orb or the orbs of a task to the queue | `ops queue [--org <org>]`, `ops queue later <orb>`, `ops queue add <orb or task>` ([[dev-knw-ops-cli]] § queue). The queue holds your orbs of each org, and `--org` is a filter. The web page is the Cannon at `/<org>/cannon`: it shows your orbs of each org, with an org filter. |
+| See your queue of agent orbs, park an orb, add an orb or the orbs of a task to the queue, wake an orb, or close it | `ops queue [--org <org or all>]`, `ops queue later <orb>`, `ops queue add <orb or task>`, `ops queue wake <orb>`, `ops queue close <orb>` ([[dev-knw-ops-cli]] § queue). The queue shows the orbs with an object in the active org; `--org all` gives each org. The web page is the Cannon at `/<org>/cannon`: one Cannon for each org. |
 | Read or set the agent defaults of a place | `ops agents defaults <ref>`, `ops agents defaults set <project or deliverable> [--flint] [--computer] [--site] [--profile] [--mode]` (ask the operator first) |
 | Answer a question that no command answers | `ops query <table> --where <field><op><value>` (see [[dev-sk-ops-use_operations]] § 7) |
 | Run an op that no command has | `ops ops`, then `ops call <op> '<json>'` |
