@@ -54,15 +54,15 @@ The model:
 | **Comment** | A post on the Updates timeline of a task. Only a task carries comments. | `ops comment …` |
 | **Agent session** | An Orbh session at an Ops object (a task, a section, a deliverable, or a project): it keeps the object as an item (`flint orbh objects add <address> --subscribe`). Its current object is its newest Ops item. It works for the person who attached it. A person speaks to it with a comment on a task (a message to the session: it answers with a comment, never in the chat), or in the chat of the session (Orbh Chat). | `ops agents` |
 | **Agent defaults** | The Flint, the computer, the site, the profile (`runtime/profile`), and the mode of a new agent session. A project and a deliverable hold them. Each value comes from the nearest level: the Flint task note of a task, then the deliverable, then the project. | `ops agents defaults <ref>`, `ops agents defaults set <project or deliverable>` |
-| **Day plan** | Your own ordered list of tasks for one date. Personal only. A task that you do shows in the plan of its do date. | `ops day …` |
-| **Do date** | The day on which the work of a task is planned. An open task with a do date before today is late. | `ops task do`, `ops day week`, `ops task list --do` |
+| **Do date** | The day on which the work of a task is planned (`YYYY-MM-DD`): the one answer to "when". An open task with a do date before today is **late**. `ops task do <task...> --on <day>` on an open task that is not yours assigns the task to you in the same write (the take). | `ops task do`, `ops task list --do`, `--do` of `ops task create\|update` |
+| **Your day** | Each task with the do date of one day that you do (you own it, or it is in your personal workspace), in your order. A task is in a day only by its do date. Your day holds your tasks of each org. | `ops day show\|week\|reorder\|carry` |
 | **Calendar and event** | A calendar is a named, coloured set of events; one is your default. An event is timed, all-day, or a **period** (an all-day event of more than one day). It can repeat, and it can attach to a task or a deadline. | `ops calendar …`, `ops event …` |
 | **Share** | Access to one record (a task, a project, a deliverable) for another org or one person, as `reader` or `editor`. | `ops share …` |
 | **Address** | The stable name of a record: `@v1/<org>/<kind>/<key>#ops` (for example `@v1/acme/task/<id>#ops`). A project, a deliverable, a task, a task group, and a notepad have an address row (an alias, else the id form). A section and a deployment have the id form only (`@v1/<org>/section/<id>#ops`). A plan, a step, a deadline, and a blocker have no address: use the ID. | `ops address <record>`, any record argument |
 | **Person** | A profile in the scope of the org. `ops member list` gives the user rows that owners and assignees use. | `ops people search\|show`, `ops member list` |
 | **Waybill** | The activity log and the undo and redo stacks of each scope. | `ops activity list`, `ops history`, `ops undo`, `ops redo` |
 
-Personal records: notifications (`ops notify`), favourites (`ops favourite`), and the day plan. The full model is in [[dev-knw-ops-data_model]] § The Model.
+Personal records: notifications (`ops notify`), favourites (`ops favourite`), and your order of the tasks of each day (`ops day reorder`). The full model is in [[dev-knw-ops-data_model]] § The Model.
 
 ## 2. Pick the build and the data, and sign in
 
@@ -96,7 +96,7 @@ The CLI acts in the active org: `--org <slug|name|me>` on the command, else the 
 2. Pass `--org <org>` on each command. Do not change the stored default unless the operator asks.
 3. On dev data, write tests in the org `test`. On prod data, use the personal workspace (`me`) for a test, and only when the operator asks.
 
-The day plan is personal: `ops day` takes no team org (`day_plan_personal_only`, exit 2).
+Your day holds your tasks of each org: the stored default org does not apply to `ops day`. `ops day show` and `ops day week` take a team `--org` as a filter. `ops day reorder` and `ops day carry` act on your own day: they refuse a team `--org` (`day_personal_only`, exit 2).
 
 ## 4. Find the record
 
@@ -138,7 +138,7 @@ Use the first command that fits. `ops <noun> <verb> --help` gives the flags and 
 | **Change a step** (plan or stream) | `ops step split <step> [--before]`, `ops step split-beside <step>`, `ops step state <planned\|active\|done> <steps...>`, `ops step done-next <step>`, `ops step move-links --link <from>:<to> --end from\|to --target <step>`, `ops step remove-links <from>:<to>`, `ops step place <step> --x --y`; a stream step title needs `--stream <stream>` |
 | **Share** a record | `ops share list\|access <record>`, `ops share add <record> --to org:<slug>\|person:<user ID> [--permission reader\|editor]`, `ops share permission <shareId> <reader\|editor>`, `ops share remove <shareId>`, `ops share with` |
 | **Calendar** and events | `ops calendar list\|show\|create\|update\|delete\|default`, `ops event list [--from <day>] [--days <n>]`, `ops event create <title> (--start <YYYY-MM-DDTHH:mm> (--end <dt> \| --duration 1h) \| --date <day> [--until <day>]) [--repeat … --weekdays …] [--attach task:<ref>]`, `ops event update\|delete <event> [--occurrence <day>] [--scope this\|following\|all]`, `ops event attach\|detach\|for` |
-| **Schedule** | `ops deadline create\|shift\|links\|requires\|assign`, `ops task do <task...> --on <day>`, `ops day week`, `ops day candidates --date today` (open tasks of every org, the planned ones marked; personal: no team `--org`), then `ops day add <taskId>...`, `ops day show\|reorder\|carry`, `ops event create <label> --date <day> [--until <day>]` (a label on a range of days; `ops day-label` is gone), `ops deployment schedule` |
+| **Schedule** | `ops deadline create\|shift\|links\|requires\|assign`, `ops task do <task...> --on <day\|none> [--top]` (an open task that is not yours becomes yours; `ops task update <task> --do <day\|none>` keeps the owner), `ops task list --mine --do none [--all-orgs]` (your open tasks with no do date), `ops day show\|week\|reorder\|carry`, `ops event create <label> --date <day> [--until <day>]` (a label on a range of days; `ops day-label` is gone), `ops deployment schedule` |
 | **Block** and unblock | `ops blocker create <title> --check <date> --on <record>`, `ops blocker list --due`, `ops blocker delay <blocker> <date>` (the date is an argument, not `--to`), `ops blocker resolve\|drop\|reopen` |
 | **Comment** | `ops comment list\|add\|edit\|react <task> …`, `ops comment count <tasks...>`, `ops comment people` (who you can mention) |
 | **Show images and videos** in an Update | `ops media attach <task> <path...> [--body <text>\|-] [--body-file <path>] [--no-comment] [--no-ffmpeg]` (one Update with an embed `![[ops-media:<fileId>]]` on each line), `ops media list <task>`, `ops media get <task> <fileId> [-o <path>]`, `ops media url <task> <fileId...>` (signed URLs: never post them), `ops media detach <fileId>` ([[dev-knw-ops-cli]] § media) |
@@ -165,7 +165,7 @@ Use the first command that fits. `ops <noun> <verb> --help` gives the flags and 
    4. An `=` condition on the fields of an org index uses that index (the JSON gives `index`). `--index <name>` names one; `--order` is the order of the index.
    5. Some fields are hidden: the query never gives a Clerk subject, a prompt hash, or a machine id (for example `textHash` and `machineId` of `task_launches`, `ownerClerkUserId` of `notepads` and `fleet_actors`). A hidden field is not a valid name for `--where` or `--fields` (`query_unknown_field`). A deleted notepad is not given. The caps: 20 `--where`, 50 `--fields`, 4 parts in a dotted path, 120 characters in a field name. A value such as `007`, or a number past the safe integer range, stays a string.
    6. A page holds at most `--limit` rows (default 50, at most 500). A page can hold fewer rows than the limit. `more: --cursor <c>` means that there are more rows: pass `--cursor <c>`, or use `--all`. `--all` and `--count` stop at 5000 rows. `--fields` makes the rows small (`_id` always stays).
-   7. Errors: `query_unknown_table`, `query_unknown_field`, `query_bad_field`, `query_bad_index`, `query_bad_value`, `query_bad_cursor` (read again with no cursor). Each error has a hint with the next step. An org that you are not a member of gives the same answer as an org that does not exist. Some data has no table: for users and day plans use `ops member list` and `ops day show`.
+   7. Errors: `query_unknown_table`, `query_unknown_field`, `query_bad_field`, `query_bad_index`, `query_bad_value`, `query_bad_cursor` (read again with no cursor). Each error has a hint with the next step. An org that you are not a member of gives the same answer as an org that does not exist. Some data has no table: for users and for your day use `ops member list` and `ops day show`.
 2. **Any op: `ops ops` and `ops call`.** `ops ops [--area <area|module>]` prints the gateway manifest: every allowlisted op with its kind and summary. `ops call <op> '<json>' [--inject-org]` sends one op with raw JSON args (or `-` for stdin) and always prints JSON. Use it only when no typed command does the job, and read the Convex function first: a typed command adds the checks and the reference resolution that `ops call` does not.
 3. When an op is not in the manifest, the CLI cannot do the job. Report it. Do not edit the database another way.
 
@@ -223,13 +223,18 @@ Each recipe uses `--org <org>` when the org is not the active one. Use `--json` 
    The full procedure: [[dev-sk-ops-triage_inbox]].
 8. **Plan your day and your week.**
    ```bash
-   ops day week                     # the late tasks, then 7 days with their tasks
-   ops task do <task> <task> --on fri   # a do date; --on none clears it
-   ops day show today
-   ops day add <task> <task>        # at the end; --top for the start; sets the do date
-   ops day carry                    # the unfinished tasks of the last 7 days, to today
-   ops task done <task> --on yesterday  # a task that was done yesterday
+   ops day week                          # the late tasks, then 7 days with their tasks
+   ops task list --mine --do none        # your open tasks with no do date (--all-orgs: each org)
+   ops task do <task> <task> --on fri    # a do date: the tasks are in your day of Friday
+   ops task do <task> --on today --top   # first in your order of today
+   ops task do <task> --on none          # no do date: the task leaves the day; the owner stays
+   ops task create "<title>" --do today  # a new task of today
+   ops day show today                    # your day in your order; on today also late, in progress, and the deadlines
+   ops day reorder <task> --top          # or --bottom, --before <task>, --after <task>
+   ops day carry                         # your late tasks, to today
+   ops task done <task> --on yesterday   # a task that was done yesterday
    ```
+   **The take.** `ops task do <task...> --on <day>` on an open task that is not yours assigns the task to you in the same write. The line of that task says `(assigned to you)`, and `--json` has its ID in `taken`. One undo gives back the do date and the owner. To give a do date to a task of another person and keep the owner, run `ops task update <task> --do <day>`. The commands `ops day add`, `ops day remove`, `ops day new`, and `ops day candidates` are gone, with no alias.
 9. **Answer a question that no command answers.**
    ```bash
    ops query describe tasks
@@ -349,7 +354,8 @@ Each recipe uses `--org <org>` when the org is not the active one. Use `--json` 
 | `blocker_closed` | Reopen the blocker first: `ops blocker reopen <blocker> --check <date>`. |
 | `unknown option '--outcome'` | A task has no outcome (removed 2026-11-04). Run `ops task close <task> [--result <text>]` or `ops task done <task>`. |
 | `loop_full` | A task loops in at most 50 people. Take a person out first: `ops task loop remove <task> <person>`. |
-| `day_plan_personal_only` | `ops day` and `ops day candidates` are personal. Drop `--org`, or pass `--org me`. |
+| `day_personal_only` | `ops day reorder` and `ops day carry` act on your own day. Drop `--org`, or pass `--org me`. `ops day show` and `ops day week` take a team `--org` as a filter. |
+| `unknown command 'add'` (or `remove`, `new`, `candidates`) of `ops day` | These commands are gone. Put a task in a day with `ops task do <task...> --on <day>`, and take it out with `ops task do <task...> --on none`. Make a new task of a day with `ops task create "<title>" --do <day>`. List your open tasks with no do date with `ops task list --mine --do none`. |
 | `done_date_invalid` | A done date is today or a day before it, and not before the creation of the task. Give a past date: `--on yesterday`. |
 | `do_date_too_many` | Give at most 100 tasks to `ops task do`. |
 | `note: the ops-dev bundle … is older than its source` | A note only: the dev launcher runs the source. |

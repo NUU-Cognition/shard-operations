@@ -1,5 +1,5 @@
 ---
-description: "The NUU Operations data model — the places (org, project, deliverable, section, deployment), tasks and subtasks, the task primitive, the task map, the blockers, the hidden context, the headers, the route decision, the addresses, Trident streams and workspaces, shares, holds, calendars and events, agent sessions at Ops objects and the agent defaults, media in Updates (images and videos), the named sections, every field as the backend names it, the rules of each mutation, undo and Waybill, and the error codes"
+description: "The NUU Operations data model — the places (org, project, deliverable, section, deployment), tasks and subtasks, the task primitive, the task map, the blockers, the hidden context, the headers, the route decision, the addresses, Trident streams and workspaces, shares, holds, calendars and events, the do dates and your day, agent sessions at Ops objects and the agent defaults, media in Updates (images and videos), the named sections, every field as the backend names it, the rules of each mutation, undo and Waybill, and the error codes"
 orbh-sessions:
   - "[[3fb6e594-a179-4c0b-ba67-833b2ccaea67]]"
   - "[[4c4eadb7-6e8e-4529-8186-3bb1b5bdbc75]]"
@@ -45,6 +45,7 @@ Org (orgSlug)
 - A **backlog** is a section with the role `backlog`. The **master backlog** is the backlog section of the org.
 - A **deployment** is something that runs. A live deployment has an **inbox**: a section with the role `inbox`.
 - A **deliverable** is done only when a person marks it done.
+- A task has a **do date** (`tasks.doDate`): the day on which the work is planned, and the one answer to "when". The **day** of a person is each task with that do date that the person does. No other record puts a task in a day (§ Do Dates and Your Day).
 - A **blocker** says why work waits. It links to projects, deliverables, sections, tasks, plan steps, or deployments, and it has one date: the check-up date. It gates no status (§ Blockers). In the web app, "Blocked" means a blocker only. A section that waits for an upstream section reads "Waiting".
 - Projects, deliverables, sections, and deployments have a **hidden context**: Markdown that search and the route decision read, and that the page does not show.
 
@@ -64,7 +65,7 @@ Old notes, old tasks, and old commands use the words of the model before the rev
 
 | Rule | Detail |
 |------|--------|
-| Every op takes `orgSlug` | Exceptions: `workspace.*` (all the caller's organisations), `users.me`, `notifications.*` (the caller is the recipient), `updates.*` except `people` (the task names the organisation), `waybill.undo`/`redo`/`peek`/`history`/`page`/`facets`/`rowHistory` (a scope names it), `dayPlans.*` (the plan of the caller), `taskLaunches.accept` (the launch names the org). |
+| Every op takes `orgSlug` | Exceptions: `workspace.*` (all the caller's organisations), `users.me`, `notifications.*` (the caller is the recipient), `updates.*` except `people` (the task names the organisation), `waybill.undo`/`redo`/`peek`/`history`/`page`/`facets`/`rowHistory` (a scope names it), `doDates.reorder` and `deadlines.forDay` (the day of the caller; the other `doDates.*` ops, `tasks.setDoDate`, and `tasks.setDoDates` take an optional `orgSlug`), `taskLaunches.accept` (the launch names the org). |
 | Read access | `requireOrgAccess`: the org is the caller's personal workspace, or the caller's JWT lists the org. Else `org_unauthorized`. No identity gives `unauthenticated`. |
 | Write access | `requireOrgWriteAccess`: read access, and the org is not frozen. A frozen org refuses every write with `org_frozen`. Reads still work. |
 | Record in another org | The backend treats it as not found. |
@@ -337,6 +338,7 @@ Table `tasks`. Module `tasks`. One task model. The home decides where a task liv
 | `order` | number | Rank inside one order bucket (below) |
 | `createdBy`, `lastModifiedBy` | `Id<"users">`, optional | |
 | `completedAt` | number, optional | Set on the change to `done`, cleared on the change away from `done` |
+| `doDate` | string, optional | The do date: `YYYY-MM-DD`, the local date on which the work is planned. The same for each person. See § Do Dates and Your Day. |
 | `blocked`, `result`, `note` | optional | The task primitive. See § The Task Primitive. |
 | `loopedIn` | `Id<"users">[]`, optional | The people looped into the task, in the order they came in. See § Looped In. |
 
@@ -406,8 +408,8 @@ Placement errors: `task_folder_in_subsection`, `task_subsection_required`, `task
 | `agent.searchTasks` | `orgSlug, query, limit?` | `{results, truncated}`; `limit` default 25, maximum 100. See [[dev-knw-ops-cli]] for the result fields. |
 | `agent.taskContext` | `taskId, orgSlug?, commentLimit?` | The full context of one task in one call: the row with `body`, the breadcrumb, the project description, the owner and creator names, the web path, and the comments with no Waybill event. |
 | `agent.resolve` | `id, orgSlug?` | `{kind, id, orgSlug, title, record, breadcrumb}` or `null`. Kinds: `project`, `deliverable`, `subsection`, `task`, `backlog-folder`, `plan`, `plan-node`, `deadline`, `deployment`, `taskgroup`, `blocker`, `notepad`. |
-| `tasks.create` | `orgSlug, title, sectionId?, subsectionId?, projectId?, deliverableId?, parentTaskId?, unplaced?, body?, priority?\|null, tag?, recurrence?, ownerUserId?, folderId?, position?, type?, fields?, stage?, note?, noteLabel?` | `position`: `"end"` (default) or `"after-progress"` (just below the last `doing` or `done` task) |
-| `tasks.update` | `orgSlug, taskId, title?, body?, expectedTitle?, expectedBody?, priority?\|null, checkbox?, ownerUserId?\|null, rarity?\|null, blocked?\|null, result?\|null` | `expectedTitle`/`expectedBody` guard a text edit: a mismatch gives `task_text_conflict` |
+| `tasks.create` | `orgSlug, title, sectionId?, subsectionId?, projectId?, deliverableId?, parentTaskId?, unplaced?, body?, priority?\|null, tag?, recurrence?, ownerUserId?, folderId?, position?, type?, fields?, stage?, note?, noteLabel?, doDate?\|null` | `position`: `"end"` (default) or `"after-progress"` (just below the last `doing` or `done` task). `doDate` is a plain field: it changes no owner. |
+| `tasks.update` | `orgSlug, taskId, title?, body?, expectedTitle?, expectedBody?, priority?\|null, checkbox?, ownerUserId?\|null, rarity?\|null, blocked?\|null, result?\|null, doDate?\|null` | `expectedTitle`/`expectedBody` guard a text edit: a mismatch gives `task_text_conflict`. `doDate` is a plain field: it changes no owner (§ Do Dates and Your Day). |
 | `tasks.move` | `orgSlug, taskId, to` | See Move |
 | `tasks.moveMany` | `orgSlug, taskIds, to` | See Move |
 | `tasks.home` | `orgSlug, taskId, home` | The home form of (Task) 1287: `{kind: "subsection", subsectionId}`, `{kind: "backlog", projectId?, folderId?}`, or `{kind: "none"}`. `tasks.move` covers every place. |
@@ -1200,7 +1202,7 @@ A labelled gesture can name a wider scope than its rows. Examples: `deliverable.
 | `waybill.deliverableProjects` | `orgSlug` → `{deliverableId: projectId}` |
 | `waybill.undo` / `redo` | `scope, expectSeq?` |
 
-Not in Waybill: comments, notifications, notification preferences, notepads, day plans, favourites. The task side of `notepads.toTask` and `notepads.moveTextToTask` is journaled (labels `task.create` and `task.edit`), so only that side carries the agent mark of a gateway write.
+Not in Waybill: comments, notifications, notification preferences, notepads, the order of a day (`day_plans`), favourites. A write of a do date is in Waybill (labels `task.doDate` and `task.doDates`). The task side of `notepads.toTask` and `notepads.moveTextToTask` is journaled (labels `task.create` and `task.edit`), so only that side carries the agent mark of a gateway write.
 
 ## Undo and Redo
 
@@ -1394,69 +1396,85 @@ An `insertTask` offset that is outside the text or inside a chip token is also `
 | `task_destination_invalid` | `toTask` with `subsectionId` and a backlog destination |
 | `task_not_found`, `subsection_not_found` | The task or the section is absent or in another org. For `create`, `setSubsection`, and `toTask`: a section that is not in the org of the notepad. |
 
-## Day Plans
+## Do Dates and Your Day
 
-Table `day_plans`. Module `dayPlans` ((Task) 315). One row for each person and local date. The row holds the ordered task IDs of that day.
+Field `tasks.doDate`. Module `tasks` has the writes. Module `doDates` has the reads and the order of a day. The rules are in `convex/lib/doDate.ts`. Since Task 501 of the NUU Operations Flint, the do date is the one model of "when". The module `dayPlans` and its ops are gone.
+
+**The model.**
+
+1. The **do date** of a task is one local calendar date, `YYYY-MM-DD`: the day on which the work is planned. It is a field of the task, and it is the same for each person. The server stores the string and converts nothing.
+2. **Your day** is each task with that do date that you do. You do a task when you own it (`ownerUserId`), or when it is a task of your personal workspace. A task is in a day only by its do date: no other record puts a task in a day. Your day holds your tasks of each org.
+3. **To plan a task is to set its do date.** See "The take" below.
+4. A task that is not done and whose do date is before today is **late**. This is the one rule for the work of earlier days.
+5. A done task keeps its do date, and a reopen keeps it. A day stores no status: to check a task off, change the task (`ops task done <task>`).
+
+**The take.** `tasks.setDoDate` and `tasks.setDoDates` are the planning writes (`ops task do`).
+
+- A caller who gives a do date to an open task that the caller does not do becomes its owner in the same Waybill gesture. The result names the taken tasks (`taken`).
+- A clear (`doDate: null`, `ops task do --on none`) takes nothing. A done task is not taken. A caller with no member row of the org takes nothing: the write sets the date only.
+- One undo of the gesture gives back the earlier do date and the earlier owner.
+- `tasks.create` and `tasks.update` take `doDate` (`null` clears it) as a plain field. They change no owner (`--do` of `ops task create` and of `ops task update`).
+
+**The order of a day.** Table `day_plans`. One row for each person and date. The row holds only the order of that person for that day.
 
 | Field | Notes |
 |-------|-------|
 | `clerkUserId` | The Clerk user ID of the person (the personal workspace slug) |
-| `date` | `YYYY-MM-DD`, the local date of the client that writes. The server stores the string and converts nothing. |
-| `taskIds` | The plan order: at most 100 task IDs, no duplicate |
+| `date` | `YYYY-MM-DD` |
+| `taskIds` | The order of the person: task IDs |
 | `updatedAt` | Epoch milliseconds |
 
 Index `by_user_date` (`clerkUserId`, `date`).
 
-**Personal by construction.**
-
-- No `dayPlans` op takes an `orgSlug`. Each op reads and writes only the rows of the caller (`identity.subject`).
-- The table has no `orgSlug`, so an org copy does not touch it.
-- A plan can hold a task of any org that the caller can read: the personal workspace, or a team in the JWT memberships.
-
-**Status.**
-
-- The plan stores no status. `get` joins each task for its `checkbox`, and `doneCount` counts the done items.
-- To check an item, change the task: `tasks.update` (`ops task done <task>`).
-
-**Dead IDs.**
-
-- A task that is deleted, or that is in an org that the caller can no longer read, leaves every read.
-- The next write of that row (`add`, `remove`, or `reorder`) removes its ID.
-- A plan that becomes empty is deleted.
-
-**Limit.** At most 100 tasks in one plan (`day_plan_full`). An add of a task that is already in the plan changes nothing, so it passes on a full plan.
+- The row gives no membership. A day shows a task only by rule 2.
+- A task of the day that is not in the row comes after the tasks of the row: the tasks in progress, then the tasks to do, then the done tasks, and the oldest task first in each group.
+- An ID whose task is not on that day now keeps its slot in the row (at most 50 such IDs). Thus a task that comes back (an undo of a move) shows again in its place.
+- A write of a do date changes a row only when it gives the task a place (`index`).
+- A row that becomes empty is deleted.
+- The table has no `orgSlug`, so an org copy does not touch it. It is personal: each op reads and writes only the rows of the caller.
+- The table is not journaled in Waybill: a change of the order has no undo.
+- The old field `dated` (Task 495) stays in the schema until the migration `doDateUnifyMigration:run` ran on prod. No code reads or writes it.
 
 | Op | Args | Returns |
 |----|------|---------|
-| `dayPlans.get` | `date` | `{date, items: [{taskId, task}], doneCount}`. `task` is `{_id, orgSlug, title, checkbox, priority?, projectId?, deliverableId?, subsectionId?, folderId?, ownerUserId?, completedAt?}`. A day with no plan has no items. |
-| `dayPlans.unfinishedBefore` | `date, days?` | `[{date, taskId, task}]`. See the rules below. |
-| `dayPlans.add` | `date, taskIds, index?` | `{taskIds}` (the new order). See the rules below. |
-| `dayPlans.remove` | `date, taskIds` | `{taskIds}`. A task that is not in the plan is ignored. |
-| `dayPlans.reorder` | `date, taskIds` | `{taskIds}`. `taskIds` must hold each readable item of the plan exactly one time, else `day_plan_reorder_invalid`. |
-| `dayPlans.candidates` | `{}` | Web only: no gateway row. `{tasks, truncated, truncatedOrgs}`: the open tasks of the personal workspace and the open team tasks that the caller owns, at most 200 of each status in each workspace. An agent uses `agent.searchTasks` or `ops task list` instead. |
+| `tasks.setDoDate` | `orgSlug?, taskId, doDate: string\|null, index?, gestureId?` | `{taskId, doDate, changed, taken, gesture?}`. `changed` is `false` when the task had this do date already and the caller does it. `taken` is `true` when the write made the caller the owner. One Waybill gesture (label `task.doDate`). |
+| `tasks.setDoDates` | `orgSlug?, taskIds, doDate: string\|null, index?, gestureId?` | `{changed, taken, gesture?}`: `changed` is the count of the changed tasks, and `taken` lists the IDs of the taken tasks. At most 100 IDs (`do_date_too_many`), and the tasks of one org (`do_date_many_orgs`). One Waybill gesture (label `task.doDates`; `task.doDate` when one task changed) in the scope of the first changed task. A task that has the date already, and that the caller does, stays as it is. |
+| `doDates.agenda` | `orgSlug?, from, to, mine?, includeDone?, today?` | `{from, to, today, days: [{date, tasks, counts: {total, open, done}}], late, counts: {total, open, done, late}, truncated}`. The range has at most 62 days (`do_date_range_invalid`). `late` holds the open tasks with a do date before `today` and before `from`. With no `today` (the local date of the caller), `late` is empty and no task has the late mark. With `mine`, each day is in the order of the caller. One day (`from` = `to`) is your day. No `orgSlug`: each org of the caller. |
+| `doDates.unplanned` | `orgSlug?, mine?, limit?, today?` | `{tasks, truncated}`: the open tasks with no do date, the tasks in progress first, then the newest (`limit`: 100 by default, at most 300). No `orgSlug`: each org of the caller. `mine` (`true` by default with no `orgSlug`) keeps the tasks that the caller does. |
+| `doDates.inProgress` | `orgSlug?, today?` | `{tasks, truncated}`: the tasks in progress that the caller does, the newest first, at most 200 in each org. |
+| `doDates.reorder` | `date, taskIds` | `{date, taskIds}`: the order of the day after the write. The IDs that are on the day of the caller take the order given, in the places that those tasks hold now. Each other task of the day keeps its place. An ID that is not on the day changes nothing: the write refuses no list. |
+| `deadlines.forDay` | `date, withOverdue?` | `{date, due, overdue, truncated, truncatedOrgs}`: the open deadlines of the caller in each org, each `{_id, orgSlug, title, dueDate, status, taskId?, taskDoDate?}`. A deadline is of the caller when it is in the personal workspace, when the caller is an assignee, or when it is on a task that the caller owns. `overdue` (with `withOverdue`) holds the open deadlines before `date`. An org with more than 200 deadlines in a range is in `truncatedOrgs`. |
 
-**`dayPlans.unfinishedBefore` rules.**
+- Each task of the three reads of `doDates` is a task summary with `doDate?`, `parentTaskId?`, `late`, and `mine`.
+- `index` of the two writes gives the tasks a place in the order of that day of the caller (`0`: first; `ops task do --top`). With no `index`, the order of the caller does not change.
+- `gestureId` is the ID that a client gives to its gesture. The result then names the gesture (`gesture: {scope, group}`), so that the client can offer its undo.
 
-- It reads the plans of the `days` days before `date`. The default is 7, and the maximum is 31 (a larger value reads as 31).
-- It returns the tasks that are not done, readable, and not in the plan of `date`.
-- One row for each task, at its newest day. The newest day comes first, and the plan order applies inside a day.
+**The ops of before (Task 501).** The `dayPlans.*` ops are gone, with no alias:
 
-**`dayPlans.add` rules.**
+| Before | Now |
+|--------|-----|
+| `dayPlans.get` | `doDates.agenda` with `mine: true` and `from` = `to` |
+| `dayPlans.add` | `tasks.setDoDate` or `tasks.setDoDates` (with `index` for a place) |
+| `dayPlans.remove` | `tasks.setDoDate` or `tasks.setDoDates` with `doDate: null` |
+| `dayPlans.reorder` | `doDates.reorder` |
+| `dayPlans.candidates` | `doDates.inProgress` and `doDates.unplanned` |
+| `dayPlans.unfinishedBefore` | `late` of `doDates.agenda`. The carry-over is: give each late task the new do date (`ops day carry`). The window of 7 days is gone. |
+| `dayPlans.createTask` | `tasks.create` with `doDate` |
+| `dayPlans.deadlines` | `deadlines.forDay` |
 
-- The new tasks go in at `index` in the order of `taskIds`. An absent `index` is the end. A value below 0 is the start, and a value above the length is the end. A fraction rounds down.
-- A task that is already in the plan keeps its place. A duplicate ID is ignored.
-- Each task must exist in an org that the caller can read, else `task_not_found` and nothing changes.
-
-The `day_plans` table is not journaled in Waybill: the `user:` scope is the undo stack of the Strike targets. Each planner gesture has a direct inverse (`add` and `remove`).
+**The web app.** Each task has one do date control, on each surface (a task row, the task dialog, Your Day, Your Week). An open task with no do date shows a bare calendar icon. A task with a do date shows a chip; the chip of a late task is red. A click opens the picker: Today, Tomorrow, Next week, the calendar, and "No date". A done task has no do date control: it shows its done date. The row menu has "Do today" and the submenu "Do date". When a write takes a task, a toast says "Assigned to you", with Undo. **Your Day** is the page `/day`: the tasks of one day in your order, and on today your late tasks with "Move all to today". **Your Week** is the page `/week` (before: `/plan`): one column for each day. A drag inside a day changes your order, and a drag to another day changes the do date.
 
 | Code | Meaning |
 |------|---------|
-| `day_plan_date_invalid` | `date` is not a real calendar date `YYYY-MM-DD` |
-| `day_plan_days_invalid` | `days` is below 1, or not a finite number |
-| `day_plan_full` | The plan would hold more than 100 tasks |
-| `day_plan_reorder_invalid` | The new order is not the exact set of the readable items |
-| `task_not_found` | `add`: a task that is absent or in an org that the caller cannot read |
+| `do_date_invalid` | A do date, the `date` of `doDates.reorder`, or `today` is not a real calendar date `YYYY-MM-DD` |
+| `do_date_range_invalid` | `from` or `to` is not a real date, `from` is after `to`, or the range has more than 62 days |
+| `do_date_too_many` | More than 100 tasks in one `tasks.setDoDates` |
+| `do_date_many_orgs` | `tasks.setDoDates` with tasks of more than one org |
+| `deadline_day_invalid` | The `date` of `deadlines.forDay` is not a real calendar date `YYYY-MM-DD` |
+| `task_not_found` | A do date write: a task that is absent, in another org than `orgSlug`, or in an org that the caller is not in |
 | `unauthenticated` | No signed-in caller |
+
+The codes `day_plan_date_invalid`, `day_plan_days_invalid`, `day_plan_full`, `day_plan_reorder_invalid`, and `day_plan_title_required` are gone. The CLI code `day_plan_personal_only` is now `day_personal_only` ([[dev-knw-ops-cli]] § day).
 
 ## Other Tables
 
@@ -1468,7 +1486,7 @@ These tables hold support data. Most have no command of their own. `ops query` (
 | `favourites` | `home` | The stars of the homepage ((Task) 316): `orgSlug`, `userId`, `kind` (project, deliverable, subsection), `recordId`. Personal. `ops favourite`. |
 | `recent_subsections` | `home` | The sections that a person visited last: `orgSlug`, `userId`, `subsectionId`, `visitedAt`. Personal. |
 | `project_briefs` | `brief` | The brief notepad of a project ((Task) 1248): `projectId`, `notepadId?`, and the lease of the brief that runs now (`runId`, `runningUntil`). At most one row for each project. |
-| `day_plans` | `dayPlans` | § Day Plans. Personal: `clerkUserId`, `date`, `taskIds` (at most 100). No `orgSlug`. |
+| `day_plans` | `doDates` (`lib/doDateOrder`) | § Do Dates and Your Day. The order of one day of one person: `clerkUserId`, `date`, `taskIds`. Personal. No `orgSlug`. It puts no task in a day. |
 | `changelog_seen` | `changelogSeen` | The publish time of the newest release that a person saw ((Task) 323): `clerkUserId`, `seenAt`. Personal. |
 | `fleet_actors` | `lib/fleetActors` | One row for each Orbh fleet that wrote in an org: `orgSlug`, `fleetId`, `ownerClerkUserId`, `handle`, `displayName?`, `avatarUrl?`. The first agent write that names the fleet registers it for the signed-in person. A write of another person with the same fleet id is refused. A fleet is a display actor only. |
 | `task_moves`, `place_moves` | (internal) | The old ids of a task, a project, or a deliverable after an undo or a redo inserts it again with a new id. An old id still finds the record. |
@@ -1546,9 +1564,9 @@ The gateway returns `{ok: false, error: {code, message, data?}}`. The codes belo
 | `notepad_too_large`, `notepad_title_invalid`, `notepad_block_invalid`, `notepad_block_not_found`, `notepad_selection_invalid`, `notepad_task_invalid` | Notepad rule | See Notepads |
 | `notepad_undo_conflict` | `notepads.undoGesture` refused: a later change touched the notepad or the task, or the 60-second undo window of a `toTask` expired | Do not write. Read both records and report the conflict to the operator; revert by hand only when the operator asks (see Notepads § Undo) |
 | `task_destination_invalid` | `notepads.toTask` with a section and a backlog | Give one destination |
-| `day_plan_date_invalid`, `day_plan_days_invalid` | Bad date or day count | Use a real `YYYY-MM-DD`; `days` 1 to 31 |
-| `day_plan_full` | More than 100 tasks in one plan | Remove a task first |
-| `day_plan_reorder_invalid` | The plan changed, or the order is not the exact set | Read the plan again (`dayPlans.get`) |
+| `do_date_invalid`, `do_date_range_invalid`, `deadline_day_invalid` | A bad do date, a bad date of a day, or a bad range | Use a real `YYYY-MM-DD`; a range of at most 62 days, `from` not after `to` |
+| `do_date_too_many` | More than 100 tasks in one `tasks.setDoDates` | Send the tasks in parts |
+| `do_date_many_orgs` | `tasks.setDoDates` with tasks of more than one org | Send one write for each org (`ops task do` does this) |
 | `blocker_not_found`, `blocker_closed`, `blocker_check_invalid`, `blocker_link_not_found`, `blocker_title_required`, `blocker_text_too_long` | A blocker refusal (§ Blockers) | Check the ID, the state (`delay`, `resolve`, `drop` need an open blocker), the date (`YYYY-MM-DD`), the record, the text length |
 | `blocked_reason_required`, `blocked_too_long` | The old `blocked` argument of `tasks.update` with no reason, or a long text | Give a reason; prefer `blockers.create` |
 | `agent_defaults_invalid` | A bad value of `agentSessions.setDefaults` (a Flint, a computer, a site, a profile, or a mode) | Read the message, fix the value (§ Agent Defaults), and send it again |

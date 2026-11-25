@@ -21,7 +21,7 @@ orbh-fleet: ops-command-1021
 
 This shard lets an agent work in the NUU Operations web app. The agent uses the `ops` CLI. The CLI calls the Operations agent gateway, and the gateway calls the same Convex functions that the web app calls. Thus an agent write has the same checks, the same activity log (Waybill) entries, and the same notifications as a write in the web app.
 
-Load this shard when a request touches Operations records: projects, deliverables, sections, tasks and subtasks, task groups, review requests, the people looped into a task, backlogs, deployments and their inboxes, deadlines, blockers, plans and plan steps, Trident streams and workspaces, shares, holds, calendars and events, comments and the images and videos in them, notifications, activity, favourites, notepads, or the day planner.
+Load this shard when a request touches Operations records: projects, deliverables, sections, tasks and subtasks, task groups, review requests, the people looped into a task, backlogs, deployments and their inboxes, deadlines, blockers, plans and plan steps, Trident streams and workspaces, shares, holds, calendars and events, comments and the images and videos in them, notifications, activity, favourites, notepads, the do dates of tasks, or your day and your week.
 
 **Start here: [[dev-sk-ops-use_operations]].** It is the main skill of this shard. It gives the model, the builds and the sign-in, the org, references and places, the command for each job, `ops query` and `ops call` for any other read or write, seventeen recipes, the safety rules, and troubleshooting. Follow it for any Operations request. The other skills and workflows go deeper on one job.
 
@@ -57,7 +57,7 @@ Operations (Ops) is the delivery record of a person and of an organisation. The 
 11. **Trident** is the stream board. A **stream** is a lane of work with steps in zones (the shore and planned, active, done), parked steps, substreams, cross links to other streams, drawings, and the places that it serves. A **workspace** is a named set of streams of one person.
 12. A **share** gives another org or one person access to one record (`reader` or `editor`).
 9. **Blockers** say why work waits: what it waits on, the next step, an owner, and the next check-up date. A blocker links records and gates no status. It is open, resolved, or dropped.
-10. A task has no type, no stage, and no outcome: its state is its status and its result. The people **looped in** follow a task beside its owner and hear every comment. A **task group** is a set of tasks that are done together. A **day plan** is the ordered tasks of one person for one date. A task has a **do date**: the day on which the work is planned. A task that you do shows in the day plan of its do date. A done task has a **done date**.
+10. A task has no type, no stage, and no outcome: its state is its status and its result. The people **looped in** follow a task beside its owner and hear every comment. A **task group** is a set of tasks that are done together. A task has a **do date** (`YYYY-MM-DD`): the day on which the work is planned. The do date is the one answer to "when": a task is in a day only by its do date. **Your day** is each task with that do date that you do (you own it, or it is in your personal workspace), in your order. An open task with a do date before today is **late**. **The take:** `ops task do <task...> --on <day>` on an open task that is not yours assigns the task to you in the same write. A done task has a **done date**.
 13. An **agent session** is at an Ops object (a task, a section, a deliverable, or a project) when it keeps that object as an item (`flint orbh objects add <address> --subscribe`). Its current object is its newest Ops item. A project and a deliverable hold the **agent defaults** of a new agent session: the Flint, the computer, the site, the profile, and the mode.
 
 ```
@@ -71,7 +71,7 @@ org
 ├── streams ── steps (shore, planned, active, done), substreams, drawings
 ├── calendars ── events (timed, all-day, periods), shares of records
 └── activity (Waybill), notifications, comments on tasks
-person: a day plan per date, favourites per org, Trident workspaces per org
+person: the order of the tasks of each day, favourites per org, Trident workspaces per org
 ```
 
 The service derives some states. A section is done when all its root tasks are done. A deliverable is done only when a person marks it. Read [[dev-knw-ops-data_model]] for every entity, field, rule, and error code. Read [[dev-knw-ops-canvas]] before you place or move plan steps.
@@ -95,8 +95,8 @@ The service derives some states. A section is done when all its root tasks are d
 | Run a deployment | `ops deployment inbox|status|schedule|check|start-deliverable` |
 | Give a place its context | `ops project|deliverable|section|deployment context set` |
 | Record why work waits, and follow it up | `ops blocker create <title> --check <date> --on <record>`, `ops blocker list --due`, `ops blocker delay|resolve|drop` |
-| Plan when to do tasks | `ops task do <tasks...> --on <day|none>`, `ops day week`, `ops task list --do late|none|<day>..<day>` |
-| Plan your day | `ops day show|add|reorder|carry` |
+| Plan when to do tasks | `ops task do <tasks...> --on <day|none> [--top]` (an open task that is not yours becomes yours; `ops task update <task> --do <day|none>` keeps the owner), `ops day week`, `ops task list --do late|none|<day>..<day>` |
+| Plan your day | `ops day show|week|reorder|carry`, and `ops task do <task> --on <day>` to plan a task |
 | Say when a task was done, or change the done date | `ops task done <task> --on <when>`, `ops task close <task> --on <when>` |
 | Show an image or a video in an Update of a task (a screenshot, a screen recording) | `ops media attach <task> <path...> --body "<text>" --json` (images at most 20 MB, videos at most 100 MB; [[dev-knw-ops-cli]] § media) |
 | Ask for a review of a task, give the verdict, read your queue | `ops task review request|approve|changes|dismiss|cancel <task>`, `ops review list` |
@@ -276,6 +276,8 @@ Every command that shows a task or a place prints its web link or its address. T
 | Deployment | `/<org>/deployments/<deploymentId>` |
 | Plan canvas | `/<org>/plans/<planId>` |
 | Personal deadlines view | `/deadlines` |
+| Your Day (your tasks of one day, of each org) | `/day` |
+| Your Week (your do dates of a week; before: `/plan`) | `/week` |
 
 ## CLI Summary
 

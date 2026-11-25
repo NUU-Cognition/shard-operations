@@ -12,14 +12,15 @@ This shard lets an agent work in NUU Operations through the `ops` CLI. The entry
 - Deployments and their inboxes.
 - The route decision and addresses.
 - Deadlines, blockers, plans, and the plan canvas.
-- Notepads and day plans.
+- Notepads.
+- The do dates of tasks, your day, and your week: `ops task do` and `ops day`.
 - `ops query` for any other read.
 
 The source moved from the NUU Operations Flint to the NUU Flint on 2026-10-21 (ops-command-1021). Version 0.2.0 follows the revamp of Ops: sections in four homes, no closer, the backlog as a section, subtasks, the task map, abstract deployments with an inbox, the hidden context, `ops headers`, `ops route`, and `ops search`.
 
 Version 0.3.0 (ops-cli-publish-1023) adds the main skill `sk-ops-use_operations`: an agent with no other context can do Operations work with it.
 
-Version 0.8.0 (storage-1112) merges the Tasks shard into Operations: the task workflows (create task, scope task, do task, create and do task, review task, do task group), the task skills, the task knowledge, and the task scripts `task-new`, `task-link`, and `task-sync`. Each task that the shard makes has a task note and an Ops task, linked both ways. The shard depends on the Projects shard (the type `Task` and the template `tmp-proj-task-v0.2`). It adds a setup (`setup: flint`) and the script `projects-note`, which writes the Mesh note `Mesh/(System) Ops Projects.md`: the projects of the Ops org that matter to the Flint. The Tasks shard is deprecated: it stays published, and the setup uninstalls it from the Flint. Since 0.8.2 the shard has no migration files: the setup does the one-time work in each Flint. Version 0.8.3 adds the task workflow scope and do task (`scope_and_do_task`): the scope and the work of a task that exists, in one run.
+Version 0.8.0 (storage-1112) merges the Tasks shard into Operations: the task workflows (create task, scope task, do task, create and do task, review task, do task group), the task skills, the task knowledge, and the task scripts `task-new`, `task-link`, and `task-sync`. Each task that the shard makes has a task note and an Ops task, linked both ways. The shard depends on the Projects shard (the type `Task` and the template `tmp-proj-task-v0.2`). It adds a setup (`setup: flint`) and the script `projects-note`, which writes the Mesh note `Mesh/(System) Ops Projects.md`: the projects of the Ops org that matter to the Flint. The Tasks shard is deprecated: it stays published, and the setup uninstalls it from the Flint. Since 0.8.2 the shard has no migration files: the setup does the one-time work in each Flint. Version 0.8.3 adds the task workflow scope and do task (`scope_and_do_task`): the scope and the work of a task that exists, in one run. Version 0.8.4 gives the one model of the do dates (Task 501 of the NUU Operations Flint): a task has a do date, your day is each task with that do date that you do, `ops task do <task...> --on <day>` plans a task (an open task that is not yours becomes yours), and `ops day add`, `remove`, `new`, and `candidates` are gone.
 
 Version 0.7.0 (total-orchestration-1111) adds agent sessions at Ops objects: the duty of an agent session at a task, a section, a deliverable, or a project, the two ways to speak to it (a comment on a task, or the chat), `ops agents`, and the agent defaults (`ops agents defaults` and `ops agents defaults set`).
 
